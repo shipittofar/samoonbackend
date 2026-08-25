@@ -1,0 +1,6 @@
+.git
+.gitignore
+docker/django/wheels
+*.pyc
+__pycache__
+.env

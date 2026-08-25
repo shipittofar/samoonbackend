@@ -1,0 +1,195 @@
+// ============================================================
+// Phase Z.2 — Database Schema Freeze (DBML)
+//
+// Source of truth: docs/BACKEND_CONTRACT.md, docs/BACKEND_IMPLEMENTATION_PLAN.md,
+// docs/FRONTEND_CONTEXT_MODEL.md, docs/FRONTEND_CONTRACT_ALIGNMENT_REPORT.md
+//
+// Supersedes the Phase Z.1 schema freeze (same architecture; this pass
+// re-validates every table against the task's explicit section-by-section
+// spec and against FRONTEND_CONTRACT_ALIGNMENT_REPORT.md — which changed
+// no schema requirement: every Z.1 alignment finding was frontend/mock-only,
+// see that report's own conclusion). Section headers below (§1-§10) mirror
+// the task spec 1:1 so each table/rule can be cross-referenced directly.
+//
+// Schema only. No Django code, no migrations, no models.py, no
+// implementation detail beyond what a schema itself expresses.
+// ============================================================
+
+// ── §7 Enums ─────────────────────────────────────────────────────────────
+
+Enum account_type {
+  customer
+  business
+}
+
+Enum tenant_status {
+  active
+  trial
+  suspended
+  churned
+  archived
+}
+
+Enum branch_status {
+  active
+  inactive
+  maintenance
+}
+
+Enum branch_scope {
+  all
+  selected
+}
+
+Enum membership_status {
+  active
+  suspended
+  revoked
+}
+
+// ── §1 Core Identity Model — User ─────────────────────────────────────────
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  email varchar [unique, null]
+  phone_number varchar [unique, null]
+  account_type account_type [not null]
+  first_name varchar [not null]
+  last_name varchar [not null]
+  avatar varchar [null]
+  is_verified boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    email [unique, name: 'uq_users_email']
+    phone_number [unique, name: 'uq_users_phone_number']
+  }
+
+  Note: 'No role/permission/tenant column exists on this table. Authorization comes exclusively from tenant_memberships.'
+}
+
+// ── §2 Tenant Model ─────────────────────────────────────────────────────
+
+Table tenants {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar [not null]
+  slug varchar [not null, unique]
+  status tenant_status [not null, default: 'trial']
+  business_types jsonb [not null, default: `'[]'`]
+  settings jsonb [not null, default: `'{}'`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    slug [unique, name: 'uq_tenants_slug']
+  }
+
+  Note: 'No owner FK on this table — ownership is expressed exclusively via a tenant_memberships row with role=owner.'
+}
+
+// ── §3 Branch Model ────────────────────────────────────────────────────
+
+Table branches {
+  id uuid [pk, default: `gen_random_uuid()`]
+  tenant_id uuid [not null]
+  name varchar [not null]
+  slug varchar [not null]
+  status branch_status [not null, default: 'active']
+  is_default boolean [not null, default: false]
+  location jsonb [not null, default: `'{}'`]
+  contact jsonb [not null, default: `'{}'`]
+  business_hours jsonb [not null, default: `'[]'`]
+  settings jsonb [not null, default: `'{}'`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (tenant_id, slug) [unique, name: 'uq_branches_tenant_slug']
+    (tenant_id, status) [name: 'ix_branches_tenant_status']
+  }
+}
+
+Ref: branches.tenant_id > tenants.id [delete: cascade]
+
+// ── §4 Membership Model ────────────────────────────────────────────────
+
+Table tenant_memberships {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  tenant_id uuid [not null]
+  branch_scope branch_scope [not null, default: 'selected']
+  status membership_status [not null, default: 'active']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, tenant_id) [unique, name: 'uq_tenant_memberships_user_tenant']
+    (user_id, status) [name: 'ix_tenant_memberships_user_status']
+    (tenant_id, status) [name: 'ix_tenant_memberships_tenant_status']
+  }
+}
+
+Ref: tenant_memberships.user_id > users.id [delete: cascade]
+Ref: tenant_memberships.tenant_id > tenants.id [delete: cascade]
+
+// ── §5 Assigned Branches ───────────────────────────────────────────────
+
+Table tenant_membership_branches {
+  tenant_membership_id uuid [not null]
+  branch_id uuid [not null]
+
+  indexes {
+    (tenant_membership_id, branch_id) [pk]
+  }
+}
+
+Ref: tenant_membership_branches.tenant_membership_id > tenant_memberships.id [delete: cascade]
+Ref: tenant_membership_branches.branch_id > branches.id [delete: cascade]
+
+// ── §6 RBAC ─────────────────────────────────────────────────────────────
+
+Table roles {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar [not null]
+  slug varchar [not null, unique]
+
+  indexes {
+    slug [unique, name: 'uq_roles_slug']
+  }
+}
+
+Table permissions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  code varchar [not null, unique]
+  resource varchar [not null]
+  action varchar [not null]
+
+  indexes {
+    code [unique, name: 'uq_permissions_code']
+  }
+}
+
+Table role_permissions {
+  role_id uuid [not null]
+  permission_id uuid [not null]
+
+  indexes {
+    (role_id, permission_id) [pk]
+  }
+}
+
+Ref: role_permissions.role_id > roles.id [delete: cascade]
+Ref: role_permissions.permission_id > permissions.id [delete: cascade]
+
+Table tenant_membership_roles {
+  tenant_membership_id uuid [not null]
+  role_id uuid [not null]
+
+  indexes {
+    (tenant_membership_id, role_id) [pk]
+  }
+}
+
+Ref: tenant_membership_roles.tenant_membership_id > tenant_memberships.id [delete: cascade]
+Ref: tenant_membership_roles.role_id > roles.id [delete: cascade]

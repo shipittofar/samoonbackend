@@ -1,0 +1,1 @@
+from .websocket_auth import JWTAuthMiddleware
