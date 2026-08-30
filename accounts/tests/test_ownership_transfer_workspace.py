@@ -403,7 +403,7 @@ class ActiveTenantBranchConsistencyTests(TestCase):
         user.refresh_from_db()
         self.assertEqual(user.active_branch_id, branch_b.id)
 
-    def test_missing_active_tenant_raise_source(self):
+    def test_switch_branch_with_null_active_tenant_succeeds(self):
         user, owner = make_owner_user()
         tenant = make_tenant(owner)
         branch = make_branch(tenant)
@@ -414,13 +414,12 @@ class ActiveTenantBranchConsistencyTests(TestCase):
             {"branchId": str(branch.id)},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        diagnostics = response.json()["error"]["diagnostics"]
-        self.assertEqual(
-            diagnostics["raise_source"], "set_active_branch_missing_active_tenant"
-        )
-        self.assertIsNone(diagnostics["active_tenant_id"])
-        self.assertFalse(diagnostics["ids_equal"])
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        diagnostics = response.json().get("error", {}).get("diagnostics")
+        self.assertIsNone(diagnostics)
+        user.refresh_from_db()
+        self.assertEqual(user.active_tenant_id, tenant.id)
+        self.assertEqual(user.active_branch_id, branch.id)
 
     def test_transfer_rollback_restores_previous_owner_workspace(self):
         old_user, old_owner = make_owner_user()

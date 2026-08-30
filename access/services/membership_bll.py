@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError
 
 from access.constants import MembershipStatus
 from access.models import StaffAssignment, StaffMembership
+from accounts.models import User
 from access.selectors import membership_selector
 from access.services.assignment_bll import assignment_bll
 from access.services.rbac_bll import rbac_bll
@@ -88,6 +89,13 @@ class MembershipBusinessLogicLayer:
         with transaction.atomic():
             membership.status = MembershipStatus.REMOVED
             membership.save(update_fields=["status", "updated_at"])
+            workspace_bll.delete_preferred_branch_for_tenant(
+                membership.user, membership.tenant_id
+            )
+            User.objects.filter(
+                pk=membership.user_id,
+                active_tenant_id=membership.tenant_id,
+            ).update(active_tenant_id=None, active_branch_id=None)
             self._schedule_effective_permissions_invalidation(membership)
 
         return membership
@@ -201,34 +209,7 @@ class MembershipBusinessLogicLayer:
 
     @staticmethod
     def switch_active_tenant(user, tenant_id: str) -> None:
-        from uuid import UUID
-
-        from django.db import transaction
-
-        from accounts.models import User
-
-        valid_ids = MembershipBusinessLogicLayer.get_valid_tenant_ids(user)
-        if str(tenant_id) not in valid_ids:
-            raise NotAMemberOfTenantException()
-
-        # Always persist a UUID — assigning a str breaks later comparisons
-        # against Branch.tenant_id (UUID != str) inside set_active_branch.
-        coerced_tenant_id = (
-            tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id))
-        )
-
-        with transaction.atomic():
-            locked = User.objects.select_for_update().get(pk=user.pk)
-            locked.active_tenant_id = coerced_tenant_id
-            update_fields = ["active_tenant_id"]
-            if locked.active_branch_id and str(locked.active_branch.tenant_id) != str(
-                coerced_tenant_id
-            ):
-                locked.active_branch_id = None
-                update_fields.append("active_branch_id")
-            locked.save(update_fields=update_fields)
-            user.active_tenant_id = locked.active_tenant_id
-            user.active_branch_id = locked.active_branch_id
+        workspace_bll.activate_workspace(user, tenant_id, persist_preference=True)
 
     @staticmethod
     def switch_active_branch(user, branch_id: str) -> None:

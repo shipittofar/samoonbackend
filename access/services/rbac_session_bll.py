@@ -21,6 +21,10 @@ from tenants.models import Tenant
 
 class RbacSessionBusinessLogicLayer:
     def build_me(self, *, user, request) -> dict:
+        from accounts.services.workspace_bll import workspace_bll
+
+        user = self._load_user_for_me(user)
+        workspace_bll.ensure_workspace_initialized(user)
         user = self._load_user_for_me(user)
         membership_data = membership_service.get_membership_data(user)
 
