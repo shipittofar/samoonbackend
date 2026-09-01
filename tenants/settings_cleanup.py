@@ -1,11 +1,15 @@
-"""Strip Phase 1 duplicated keys from Tenant.settings.
+"""Strip duplicated/computed keys from Tenant.settings.
 
-These keys already have a typed source of truth on Branch, or are
-computed at read time. Tenant.settings must not remain a second copy.
+Phase 1: locale, ordering, features.reservations, marketplace
+cuisines/amenities/openNow/branchCount/primaryBranchSlug.
 
-Write policy: strip (do not reject, do not copy onto Branch). This matches
-the Branch.settings operational-key strip and avoids 400s for clients
-still sending the old bag.
+Phase 2: marketplace fields whose operational source of truth is Branch
+(city, email, phone_number, description, coverImage) plus the legacy
+marketplace.branches JSON list (derived from Branch records).
+
+Write policy: strip (do not reject, do not copy onto Branch).
+Listing-only keys (tagline, tags, featured, priceLevel, gallery, rating,
+reviewCount) are left in settings until a later product decision.
 """
 from __future__ import annotations
 
@@ -35,9 +39,20 @@ PHASE1_MARKETPLACE_KEYS = frozenset({
     "primaryBranchSlug",
 })
 
+PHASE2_MARKETPLACE_KEYS = frozenset({
+    "city",
+    "email",
+    "phone_number",
+    "description",
+    "coverImage",
+    "branches",
+})
 
-def strip_phase1_deprecated_tenant_settings(settings: Any) -> dict:
-    """Return a copy of settings with Phase 1 duplicated/computed keys removed."""
+DEPRECATED_MARKETPLACE_KEYS = PHASE1_MARKETPLACE_KEYS | PHASE2_MARKETPLACE_KEYS
+
+
+def strip_deprecated_tenant_settings(settings: Any) -> dict:
+    """Return a copy of settings with deprecated duplicated/computed keys removed."""
     if not isinstance(settings, dict):
         return {}
 
@@ -72,7 +87,7 @@ def strip_phase1_deprecated_tenant_settings(settings: Any) -> dict:
         marketplace = {
             key: value
             for key, value in marketplace.items()
-            if key not in PHASE1_MARKETPLACE_KEYS
+            if key not in DEPRECATED_MARKETPLACE_KEYS
         }
         if marketplace:
             cleaned["marketplace"] = marketplace
@@ -80,3 +95,7 @@ def strip_phase1_deprecated_tenant_settings(settings: Any) -> dict:
             cleaned.pop("marketplace", None)
 
     return cleaned
+
+
+# Backward-compatible name used by Phase 1 call sites.
+strip_phase1_deprecated_tenant_settings = strip_deprecated_tenant_settings

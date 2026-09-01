@@ -9,10 +9,17 @@ MARKETPLACE_COMPUTED_FIELDS = frozenset({
     "primaryBranchSlug",
 })
 
-# Branch-owned fields — no longer surfaced on tenant marketplace metadata.
+# Branch-owned fields — not stored on tenant marketplace metadata.
+# Discover overlays city/email/phone/description/coverImage from the
+# primary public branch so stale settings cannot win.
 MARKETPLACE_BRANCH_OWNED_FIELDS = frozenset({
     "cuisines",
     "amenities",
+    "city",
+    "email",
+    "phone_number",
+    "description",
+    "coverImage",
 })
 
 
@@ -26,7 +33,7 @@ def get_public_branches(tenant) -> list:
     return list(branches.all())
 
 
-def resolve_primary_branch_slug(branches: list) -> str | None:
+def resolve_primary_branch(branches: list):
     if not branches:
         return None
 
@@ -35,9 +42,28 @@ def resolve_primary_branch_slug(branches: list) -> str | None:
         None,
     )
     if default_branch is not None:
-        return default_branch.slug
+        return default_branch
 
-    return branches[0].slug
+    return branches[0]
+
+
+def resolve_primary_branch_slug(branches: list) -> str | None:
+    primary = resolve_primary_branch(branches)
+    if primary is None:
+        return None
+    return primary.slug
+
+
+def _apply_primary_branch_listing_fields(marketplace: dict, branches: list) -> None:
+    primary = resolve_primary_branch(branches)
+    if primary is None:
+        return
+
+    marketplace["city"] = getattr(primary, "city", "") or ""
+    marketplace["email"] = getattr(primary, "email", "") or ""
+    marketplace["phone_number"] = getattr(primary, "phone", "") or ""
+    marketplace["description"] = getattr(primary, "description", "") or ""
+    marketplace["coverImage"] = getattr(primary, "cover_image_url", None)
 
 
 def build_marketplace_metadata(
@@ -53,6 +79,8 @@ def build_marketplace_metadata(
         if key not in MARKETPLACE_COMPUTED_FIELDS
         and key not in MARKETPLACE_BRANCH_OWNED_FIELDS
     }
+
+    _apply_primary_branch_listing_fields(marketplace, branches)
 
     marketplace["branchCount"] = len(branches)
     marketplace["openNow"] = any(is_branch_open(branch) for branch in branches)

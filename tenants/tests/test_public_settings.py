@@ -1,6 +1,5 @@
-"""Tenant.settings persist as caller-owned JSON, except Phase 1 duplicated
-keys (locale, ordering, features.reservations, marketplace cuisines/amenities
-and computed marketplace fields) which are stripped on write.
+"""Tenant.settings persist as caller-owned JSON, except Phase 1/2
+duplicated and computed keys which are stripped on write.
 """
 import uuid
 
@@ -47,30 +46,13 @@ FULL_SETTINGS = {
     },
     "theme": {"primaryColor": "#1a1a2e"},
     "marketplace": {
-        "description": "Sophisticated cocktail bar with live music...",
-        "coverImage": "https://example.com/cover.jpg",
         "tags": ["Live Music", "Happy Hour", "Date Night"],
         "rating": 4.7,
         "reviewCount": 634,
-        "city": "New York",
         "featured": True,
         "tagline": "Craft cocktails. Live music. Good company.",
         "priceLevel": 2,
-        "phone_number": "+1 (212) 555-0600",
-        "email": "hello@example.com",
         "gallery": [],
-        "branches": [
-            {
-                "slug": "main",
-                "name": "East Village",
-                "address": "555 Tap Street",
-                "city": "New York",
-                "phone_number": "+1 212 555 0600",
-                "openNow": False,
-                "todayHours": "16:00–02:00",
-                "image": "https://example.com/branch.jpg",
-            }
-        ],
     },
 }
 
@@ -169,6 +151,13 @@ class TenantSettingsCreateTests(TestCase):
                 "openNow": True,
                 "branchCount": 99,
                 "primaryBranchSlug": "fake-slug",
+                "city": "Settings City",
+                "email": "settings@example.com",
+                "phone_number": "+1 555 0100",
+                "description": "From settings",
+                "coverImage": "https://example.com/cover.jpg",
+                "branches": [{"slug": "ignored"}],
+                "rating": 4.7,
             },
             "theme": {"primaryColor": "#1a1a2e"},
             "featureFlags": {"menu.enabled": False},
@@ -189,11 +178,18 @@ class TenantSettingsCreateTests(TestCase):
         self.assertNotIn("ordering", stored)
         self.assertEqual(stored["features"], {"menu": True})
         self.assertEqual(stored["marketplace"]["tagline"], "Keep this")
+        self.assertEqual(stored["marketplace"]["rating"], 4.7)
         self.assertNotIn("cuisines", stored["marketplace"])
         self.assertNotIn("amenities", stored["marketplace"])
         self.assertNotIn("openNow", stored["marketplace"])
         self.assertNotIn("branchCount", stored["marketplace"])
         self.assertNotIn("primaryBranchSlug", stored["marketplace"])
+        self.assertNotIn("city", stored["marketplace"])
+        self.assertNotIn("email", stored["marketplace"])
+        self.assertNotIn("phone_number", stored["marketplace"])
+        self.assertNotIn("description", stored["marketplace"])
+        self.assertNotIn("coverImage", stored["marketplace"])
+        self.assertNotIn("branches", stored["marketplace"])
         self.assertEqual(stored["theme"], {"primaryColor": "#1a1a2e"})
         self.assertEqual(stored["featureFlags"], {"menu.enabled": False})
         self.assertEqual(stored["addressCapabilities"], {"can_deliver": True})
@@ -234,7 +230,7 @@ class TenantSettingsUpdateTests(TestCase):
         tenant.settings = FULL_SETTINGS
         tenant.save(update_fields=["settings"])
 
-        partial_settings = {"marketplace": {"rating": 4.9, "city": "Alexandria"}}
+        partial_settings = {"marketplace": {"rating": 4.9, "tagline": "Alexandria"}}
 
         client = APIClient()
         client.force_authenticate(user=user)
@@ -315,9 +311,10 @@ class TenantSettingsResponseContractTests(TestCase):
 
         self.assertEqual(retrieve_response.data["settings"], FULL_SETTINGS)
         self.assertEqual(
-            retrieve_response.data["settings"]["marketplace"]["branches"][0],
-            FULL_SETTINGS["marketplace"]["branches"][0],
+            retrieve_response.data["settings"]["marketplace"]["tagline"],
+            FULL_SETTINGS["marketplace"]["tagline"],
         )
+        self.assertNotIn("branches", retrieve_response.data["settings"]["marketplace"])
 
 
 class TenantFeatureFlagHelperTests(TestCase):

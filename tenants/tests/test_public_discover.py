@@ -137,6 +137,10 @@ class PublicDiscoverListTests(TestCase):
             name="Main",
             slug="main-branch",
             is_default=True,
+            city="Brooklyn",
+            email="branch@example.com",
+            phone="+15551001001",
+            description="Branch about text",
             cuisines=["Italian"],
             amenities=["WiFi"],
         )
@@ -169,7 +173,11 @@ class PublicDiscoverListTests(TestCase):
         self.assertEqual(item["theme"], {"primaryColor": "#e85d04"})
         self.assertEqual(item["branding"]["primaryColor"], "#e85d04")
         self.assertIn("image", item)
-        self.assertEqual(item["marketplace"]["description"], "A great spot")
+        self.assertEqual(item["marketplace"]["description"], "Branch about text")
+        self.assertEqual(item["marketplace"]["city"], "Brooklyn")
+        self.assertEqual(item["marketplace"]["email"], "branch@example.com")
+        self.assertEqual(item["marketplace"]["phone_number"], "+15551001001")
+        self.assertIsNone(item["marketplace"]["coverImage"])
         self.assertEqual(item["marketplace"]["rating"], 4.5)
         self.assertEqual(item["marketplace"]["branchCount"], 1)
         self.assertEqual(item["marketplace"]["primaryBranchSlug"], "main-branch")

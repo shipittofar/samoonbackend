@@ -292,6 +292,11 @@ class BranchDiscoverDTO:
     status: str
     is_default: bool
     time_zone: str
+    email: str = ""
+    phone: str = ""
+    description: str = ""
+    cover_image: str | None = None
+    cover_image_url: str | None = None
     cuisines: list = field(default_factory=list)
     amenities: list = field(default_factory=list)
     working_hours: list[WorkingHourDTO] = field(default_factory=list)
@@ -312,6 +317,11 @@ class BranchDiscoverDTO:
             status=branch.status,
             is_default=branch.is_default,
             time_zone=branch.time_zone or "UTC",
+            email=branch.email or "",
+            phone=branch.phone or "",
+            description=branch.description or "",
+            cover_image=_image_name(branch.cover_image),
+            cover_image_url=_image_url(branch.cover_image),
             cuisines=list(branch.cuisines or []),
             amenities=list(branch.amenities or []),
             working_hours=[
@@ -333,6 +343,11 @@ class BranchDiscoverDTO:
         payload["working_hours"] = hours
         payload.setdefault("cuisines", [])
         payload.setdefault("amenities", [])
+        payload.setdefault("email", "")
+        payload.setdefault("phone", "")
+        payload.setdefault("description", "")
+        payload.setdefault("cover_image", None)
+        payload.setdefault("cover_image_url", None)
         return cls(**payload)
 
 
