@@ -1,8 +1,6 @@
-"""Phase Z.6.4 (contract alignment) — Tenant.settings must be treated as
-an opaque JSON configuration object: the backend stores and returns
-exactly what the caller (API input / admin configuration) provides, never
-adding defaults, never hardcoding marketplace configuration, never
-merging/reshaping/dropping keys.
+"""Tenant.settings persist as caller-owned JSON, except Phase 1 duplicated
+keys (locale, ordering, features.reservations, marketplace cuisines/amenities
+and computed marketplace fields) which are stripped on write.
 """
 import uuid
 
@@ -51,18 +49,13 @@ FULL_SETTINGS = {
     "marketplace": {
         "description": "Sophisticated cocktail bar with live music...",
         "coverImage": "https://example.com/cover.jpg",
-        "cuisines": ["Cocktails", "Craft Beer", "Bar Bites"],
         "tags": ["Live Music", "Happy Hour", "Date Night"],
         "rating": 4.7,
         "reviewCount": 634,
         "city": "New York",
-        "branchCount": 1,
-        "openNow": False,
-        "primaryBranchSlug": "main",
         "featured": True,
         "tagline": "Craft cocktails. Live music. Good company.",
         "priceLevel": 2,
-        "amenities": ["Parking", "Pet Friendly"],
         "phone_number": "+1 (212) 555-0600",
         "email": "hello@example.com",
         "gallery": [],
@@ -149,6 +142,64 @@ class TenantSettingsCreateTests(TestCase):
 
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(response.data["settings"], unconventional_settings)
+
+    def test_create_strips_phase1_duplicated_settings_keys(self):
+        user = make_user()
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        payload = {
+            "currency": "EUR",
+            "language": "en",
+            "timezone": "Europe/Rome",
+            "ordering": {
+                "dineIn": True,
+                "delivery": False,
+                "takeaway": True,
+                "onlinePayment": False,
+            },
+            "features": {
+                "menu": True,
+                "reservations": True,
+            },
+            "marketplace": {
+                "tagline": "Keep this",
+                "cuisines": ["Cocktails"],
+                "amenities": ["Parking"],
+                "openNow": True,
+                "branchCount": 99,
+                "primaryBranchSlug": "fake-slug",
+            },
+            "theme": {"primaryColor": "#1a1a2e"},
+            "featureFlags": {"menu.enabled": False},
+            "addressCapabilities": {"can_deliver": True},
+        }
+
+        response = client.post(
+            "/api/tenants/create/",
+            data={"name": "Phase1 Strip Tenant", "settings": payload},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        stored = response.data["settings"]
+        self.assertNotIn("currency", stored)
+        self.assertNotIn("language", stored)
+        self.assertNotIn("timezone", stored)
+        self.assertNotIn("ordering", stored)
+        self.assertEqual(stored["features"], {"menu": True})
+        self.assertEqual(stored["marketplace"]["tagline"], "Keep this")
+        self.assertNotIn("cuisines", stored["marketplace"])
+        self.assertNotIn("amenities", stored["marketplace"])
+        self.assertNotIn("openNow", stored["marketplace"])
+        self.assertNotIn("branchCount", stored["marketplace"])
+        self.assertNotIn("primaryBranchSlug", stored["marketplace"])
+        self.assertEqual(stored["theme"], {"primaryColor": "#1a1a2e"})
+        self.assertEqual(stored["featureFlags"], {"menu.enabled": False})
+        self.assertEqual(stored["addressCapabilities"], {"can_deliver": True})
+
+        tenant = Tenant.objects.get(id=response.data["id"])
+        self.assertEqual(tenant.settings, stored)
 
 
 class TenantSettingsUpdateTests(TestCase):
@@ -256,6 +307,9 @@ class TenantSettingsResponseContractTests(TestCase):
             format="json",
         )
         tenant_id = create_response.data["id"]
+        tenant = Tenant.objects.get(id=tenant_id)
+        tenant.status = "active"
+        tenant.save(update_fields=["status", "settings", "updated_at"])
 
         retrieve_response = APIClient().get(f"/api/tenants/{tenant_id}/")
 

@@ -17,6 +17,7 @@ from tenants.checkout_config import (
     map_checkout_camel_to_snake,
     strip_operational_settings_keys,
 )
+from tenants.settings_cleanup import strip_phase1_deprecated_tenant_settings
 
 
 class WorkingHourSerializer(serializers.Serializer):
@@ -71,7 +72,7 @@ class TenantCreateSerializer(serializers.Serializer):
                 validate_tenant_branding(theme)
             except ValueError as exc:
                 raise serializers.ValidationError({"theme": str(exc)}) from exc
-        return value
+        return strip_phase1_deprecated_tenant_settings(value)
 
     def to_internal_value(self, data):
         data = data.dict() if hasattr(data, "dict") else dict(data)

@@ -48,6 +48,13 @@ def make_tenant(**kwargs):
     return Tenant.objects.create(**defaults)
 
 
+def plant_settings(tenant, settings):
+    """Bypass Tenant.save sanitizer to leave stale Phase 1 keys in JSON."""
+    Tenant.objects.filter(pk=tenant.pk).update(settings=settings)
+    tenant.refresh_from_db()
+    cache.clear()
+
+
 def make_branch(tenant, **kwargs):
     defaults = {
         "name": f"Branch {uuid.uuid4().hex[:6]}",
@@ -189,6 +196,34 @@ class PublicDiscoverListTests(TestCase):
         self.assertEqual(branch["cuisines"], ["Italian"])
         self.assertEqual(branch["amenities"], ["WiFi"])
         self.assertEqual(set(branch["location"].keys()), {"address", "city", "country"})
+
+    def test_cuisines_and_amenities_come_from_branch_not_tenant_settings(self):
+        tenant = make_tenant()
+        plant_settings(
+            tenant,
+            {
+                "marketplace": {
+                    "cuisines": ["From Settings"],
+                    "amenities": ["Settings Amenity"],
+                    "tagline": "Keep this",
+                }
+            },
+        )
+        make_branch(
+            tenant,
+            name="Main",
+            cuisines=["Italian"],
+            amenities=["WiFi"],
+        )
+
+        response = self.client.get(DISCOVER_URL)
+        item = response.data["results"][0]
+
+        self.assertEqual(item["marketplace"]["tagline"], "Keep this")
+        self.assertNotIn("cuisines", item["marketplace"])
+        self.assertNotIn("amenities", item["marketplace"])
+        self.assertEqual(item["branches"][0]["cuisines"], ["Italian"])
+        self.assertEqual(item["branches"][0]["amenities"], ["WiFi"])
 
     def test_inactive_tenants_are_excluded(self):
         active_tenant = make_tenant(name="Active Diner")
@@ -346,9 +381,8 @@ class PublicDiscoverListTests(TestCase):
         self.assertEqual(response.data["count"], 2)
 
     def test_primary_branch_slug_prefers_default_branch(self):
-        tenant = make_tenant(
-            settings={"marketplace": {"primaryBranchSlug": "stale-slug"}},
-        )
+        tenant = make_tenant()
+        plant_settings(tenant, {"marketplace": {"primaryBranchSlug": "stale-slug"}})
         make_branch(tenant, name="Alpha", slug="alpha", is_default=False)
         make_branch(tenant, name="Central", slug="central", is_default=True)
 
@@ -405,8 +439,9 @@ class PublicDiscoverListTests(TestCase):
         self.assertEqual(branch_data["todayHours"], "10:30-18:45")
 
     def test_branch_count_matches_returned_branches(self):
-        tenant = make_tenant(
-            settings={"marketplace": {"branchCount": 99, "rating": 4.2}},
+        tenant = make_tenant()
+        plant_settings(
+            tenant, {"marketplace": {"branchCount": 99, "rating": 4.2}}
         )
         make_branch(tenant, name="Branch One")
         make_branch(tenant, name="Branch Two")
@@ -426,7 +461,8 @@ class PublicDiscoverListTests(TestCase):
     @patch("tenants.services.branch_availability.django_timezone.now")
     def test_marketplace_open_now_is_computed_not_stored(self, mock_now):
         mock_now.return_value = MONDAY_CLOSED
-        tenant = make_tenant(settings={"marketplace": {"openNow": True}})
+        tenant = make_tenant()
+        plant_settings(tenant, {"marketplace": {"openNow": True}})
         branch = make_branch(tenant, time_zone="UTC")
         add_working_hours(branch, monday=(time(9, 0), time(22, 0), False))
 

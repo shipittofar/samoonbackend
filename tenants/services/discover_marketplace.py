@@ -45,6 +45,8 @@ def build_marketplace_metadata(
     branches: list,
 ) -> dict:
     stored = (getattr(tenant, "settings", None) or {}).get("marketplace") or {}
+    # Defense in depth: these keys are stripped on Tenant.save / API write,
+    # but QuerySet.update (and pre-migration rows) may still contain them.
     marketplace = {
         key: value
         for key, value in stored.items()

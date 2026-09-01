@@ -8,6 +8,7 @@ from core.utils.slug import assign_unique_slug
 from core.models import WebPImageMixin
 from tenants.constants.business_type import validate_business_types
 from tenants.checkout_config import default_branch_settings
+from tenants.settings_cleanup import strip_phase1_deprecated_tenant_settings
 
 
 class OwnerStatus(models.TextChoices):
@@ -82,6 +83,7 @@ class Tenant(WebPImageMixin, models.Model):
     def save(self, *args, **kwargs):
         if self.business_types is not None:
             self.business_types = validate_business_types(self.business_types)
+        self.settings = strip_phase1_deprecated_tenant_settings(self.settings)
         assign_unique_slug(self, Tenant)
         super().save(*args, **kwargs)
 

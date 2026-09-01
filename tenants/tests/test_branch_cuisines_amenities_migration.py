@@ -35,13 +35,15 @@ class BranchCuisinesAmenitiesMigrationTests(TestCase):
         tenant = Tenant.objects.create(
             owner=owner,
             name="Multi Branch Tenant",
+        )
+        Tenant.objects.filter(pk=tenant.pk).update(
             settings={
                 "marketplace": {
                     "cuisines": ["Italian", "Pizza"],
                     "amenities": ["WiFi", "Parking"],
                     "rating": 4.5,
                 }
-            },
+            }
         )
         branch_a = Branch.objects.create(tenant=tenant, name="Branch A")
         branch_b = Branch.objects.create(tenant=tenant, name="Branch B", is_default=True)
@@ -81,6 +83,8 @@ class BranchCuisinesAmenitiesMigrationTests(TestCase):
         tenant = Tenant.objects.create(
             owner=owner,
             name="Cuisines Only Tenant",
+        )
+        Tenant.objects.filter(pk=tenant.pk).update(
             settings={"marketplace": {"cuisines": ["Mexican"]}},
         )
         branch = Branch.objects.create(tenant=tenant, name="Branch")
