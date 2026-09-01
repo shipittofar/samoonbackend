@@ -88,7 +88,12 @@ class Tenant(WebPImageMixin, models.Model):
         super().save(*args, **kwargs)
 
     def get_feature_flag(self, flag: str, default=False):
-        """Read a flag from settings.featureFlags without inventing defaults."""
+        """JSON accessor for ``settings.featureFlags``.
+
+        Does not consult Owner.plan, RBAC, or Branch capabilities.
+        Production authorization must not call this to grant or deny
+        permissions; the frontend resolves flags separately for UI/nav.
+        """
         feature_flags = (self.settings or {}).get("featureFlags") or {}
         return feature_flags.get(flag, default)
 

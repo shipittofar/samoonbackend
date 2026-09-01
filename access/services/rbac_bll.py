@@ -222,6 +222,15 @@ class RbacBusinessLogicLayer:
         return self._apply_permission_overrides(permissions, overrides)
 
     def _apply_feature_flags(self, *, tenant, permissions: set[str]) -> set[str]:
+        """Identity. Feature flags are not backend authorization.
+
+        ``Tenant.settings.featureFlags`` are tenant-level UI/rollout
+        overrides consumed by the frontend (discover, navigation, console
+        ``hasPermission``). Backend RBAC stays independent. Do not filter
+        ``permissions`` here unless a later product decision plus tests
+        define exact behavior for owner, admin, staff, branch scope,
+        overrides, missing flags, and unknown flags.
+        """
         return permissions
 
     def _apply_read_manage_filter(self, *, user, tenant, permissions: set[str]) -> set[str]:

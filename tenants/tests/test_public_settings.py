@@ -1,5 +1,5 @@
-"""Tenant.settings persist as caller-owned JSON, except Phase 1/2
-duplicated and computed keys which are stripped on write.
+"""Tenant.settings persist as caller-owned JSON, except Phase 1/2/4A
+duplicated, computed, and unused ``features`` keys which are stripped on write.
 """
 import uuid
 
@@ -176,7 +176,7 @@ class TenantSettingsCreateTests(TestCase):
         self.assertNotIn("language", stored)
         self.assertNotIn("timezone", stored)
         self.assertNotIn("ordering", stored)
-        self.assertEqual(stored["features"], {"menu": True})
+        self.assertNotIn("features", stored)
         self.assertEqual(stored["marketplace"]["tagline"], "Keep this")
         self.assertEqual(stored["marketplace"]["rating"], 4.7)
         self.assertNotIn("cuisines", stored["marketplace"])

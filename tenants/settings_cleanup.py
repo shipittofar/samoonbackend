@@ -7,6 +7,11 @@ Phase 2: marketplace fields whose operational source of truth is Branch
 (city, email, phone_number, description, coverImage) plus the legacy
 marketplace.branches JSON list (derived from Branch records).
 
+Phase 4A: the entire ``settings.features`` object. Frontend TenantSettings
+documents ``features`` as a mistaken guess with zero consumers; the live
+contract is ``settings.featureFlags`` (dotted keys). Backend has no
+readers of ``features.*``. ``featureFlags`` is not stripped.
+
 Write policy: strip (do not reject, do not copy onto Branch).
 Listing-only keys (tagline, tags, featured, priceLevel, gallery, rating,
 reviewCount) are left in settings until a later product decision.
@@ -73,14 +78,7 @@ def strip_deprecated_tenant_settings(settings: Any) -> dict:
         else:
             cleaned.pop("ordering", None)
 
-    features = cleaned.get("features")
-    if isinstance(features, dict):
-        features = dict(features)
-        features.pop("reservations", None)
-        if features:
-            cleaned["features"] = features
-        else:
-            cleaned.pop("features", None)
+    cleaned.pop("features", None)
 
     marketplace = cleaned.get("marketplace")
     if isinstance(marketplace, dict):

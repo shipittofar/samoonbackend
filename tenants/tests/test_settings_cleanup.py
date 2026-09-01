@@ -35,7 +35,6 @@ class StripPhase1DeprecatedTenantSettingsTests(SimpleTestCase):
         self.assertEqual(
             cleaned,
             {
-                "features": {"menu": True},
                 "marketplace": {
                     "tagline": "Keep this",
                     "gallery": [],

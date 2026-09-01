@@ -69,6 +69,12 @@ class DiscoverTenantResponseSerializer(serializers.Serializer):
         return list(getattr(obj, "business_types", None) or [])
 
     def get_featureFlags(self, obj) -> dict:
+        """Public catalog overlay of tenant.settings.featureFlags.
+
+        Kept: DiscoverTenant and public-context resolve menu/ordering/
+        reservations/loyalty from this field. These are not entitlements
+        and are not equivalent to Branch operational capabilities.
+        """
         return (getattr(obj, "settings", None) or {}).get("featureFlags") or {}
 
     def get_image(self, obj) -> str | None:
