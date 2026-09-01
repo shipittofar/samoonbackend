@@ -182,7 +182,6 @@ class TenantBrandingCrudTests(TestCase):
                 "accentHoverColor": "#aabbcc",
                 "fontBody": "inter",
                 "fontsByLocale": {"en": "inter"},
-                "futureToken": "allowed",
             }
         }
         response = client.post(
@@ -226,7 +225,10 @@ class TenantBrandingCrudTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
-        settings = {"marketplace": {"rating": "4.7"}, "customKey": True}
+        settings = {
+            "marketplace": {"rating": 4.7, "tagline": "Hello"},
+            "contactEmail": "ops@example.com",
+        }
         response = client.post(
             "/api/tenants/create/",
             data={"name": "Opaque Settings Tenant", "settings": settings},

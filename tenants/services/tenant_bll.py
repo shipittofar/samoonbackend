@@ -72,6 +72,30 @@ class TenantBusinessLogicLayer:
 
     @staticmethod
     @transaction.atomic
+    def patch_tenant_settings(user, tenant_id, patch: dict) -> Tenant:
+        from tenants.settings_cleanup import (
+            TenantSettingsContractError,
+            merge_settings_patch,
+        )
+        from rest_framework.exceptions import ValidationError
+
+        tenant = tenant_dal.get_tenant_for_update(tenant_id)
+        if not tenant:
+            raise TenantNotFoundException()
+        _assert_owns_tenant(user, tenant)
+        try:
+            tenant.settings = merge_settings_patch(tenant.settings, patch)
+        except TenantSettingsContractError as exc:
+            raise ValidationError({"settings": str(exc)}) from exc
+        tenant.save(update_fields=["settings", "updated_at"])
+        owner_user_id = tenant.owner_user_id
+        transaction.on_commit(
+            lambda: tenant_dal.invalidate_tenant_cache(tenant.id, owner_user_id)
+        )
+        return tenant
+
+    @staticmethod
+    @transaction.atomic
     def update_tenant(user, tenant_id: int, **data) -> Tenant:
         tenant = tenant_dal.get_tenant_for_update(tenant_id)
 

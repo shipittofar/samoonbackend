@@ -6,6 +6,7 @@ from tenants.api.serializers.response.tenant_summary import (
     build_tenant_summary,
 )
 from tenants.models import WorkingHour
+from tenants.settings_cleanup import project_public_tenant_settings
 
 
 WEEKDAY_LABELS = dict(WorkingHour.Weekday.choices)
@@ -211,9 +212,17 @@ class TenantResponseSerializer(serializers.Serializer):
     business_types = BusinessTypesField(read_only=True)
     is_active = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
-    settings = serializers.JSONField(read_only=True)
+    settings = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
+
+    def get_settings(self, obj):
+        raw = getattr(obj, "settings", None) or {}
+        if not isinstance(raw, dict):
+            raw = {}
+        if self.context.get("public_settings"):
+            return project_public_tenant_settings(raw)
+        return raw
 
     def get_owner_id(self, obj):
         owner_user_id = getattr(obj, "owner_user_id", None)
@@ -237,9 +246,12 @@ class PublicTenantResponseSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
     tax_percentage = serializers.DecimalField(max_digits=4, decimal_places=2, read_only=True)
-    settings = serializers.JSONField(read_only=True)
+    settings = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
+
+    def get_settings(self, obj):
+        return project_public_tenant_settings(getattr(obj, "settings", None) or {})
 
     def get_image(self, obj):
         return _media_url(obj, "image", "image_url")

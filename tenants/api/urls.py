@@ -20,6 +20,10 @@ urlpatterns = [
          TenantUpdateAPIView.as_view(),
          name="tenant-update"
          ),
+    path("<uuid:tenant_id>/settings/",
+         TenantSettingsPatchAPIView.as_view(),
+         name="tenant-settings-patch"
+         ),
     path("",
          TenantListAPIView.as_view(),
          name="tenant-list"

@@ -74,13 +74,28 @@ class TenantUpdateAPIView(UpdateAPIView):
         return Response(TenantResponseSerializer(tenant).data)
 
 
+@extend_schema(tags=["Tenant - Tenant"], summary="patch Tenant settings")
+class TenantSettingsPatchAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def patch(self, request, tenant_id, *args, **kwargs):
+        tenant = tenant_bll.patch_tenant_settings(
+            user=request.user,
+            tenant_id=tenant_id,
+            patch=dict(request.data),
+        )
+        return Response(TenantResponseSerializer(tenant).data)
+
+
 @extend_schema(tags=["Tenant - Tenant"], summary="retrieve Tenant (public catalog)")
 class TenantRetrieveAPIView(RetrieveAPIView):
     """Public tenant detail — hidden/non-listable tenants return 404."""
 
     def retrieve(self, request, *args, **kwargs):
         tenant = tenant_bll.get_public_tenant(tenant_id=kwargs["tenant_id"])
-        return Response(TenantResponseSerializer(tenant).data)
+        return Response(
+            TenantResponseSerializer(tenant, context={"public_settings": True}).data
+        )
 
 
 @extend_schema(tags=["Tenant - Tenant"], summary="list public tenants (discover)")

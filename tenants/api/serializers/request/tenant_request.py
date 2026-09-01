@@ -11,13 +11,15 @@ from tenants.models import (
     BranchOrderType,
     BranchPaymentMethod,
 )
-from tenants.branding import validate_tenant_branding
 from tenants.checkout_config import (
     flatten_nested_checkout,
     map_checkout_camel_to_snake,
     strip_operational_settings_keys,
 )
-from tenants.settings_cleanup import strip_phase1_deprecated_tenant_settings
+from tenants.settings_cleanup import (
+    TenantSettingsContractError,
+    validate_tenant_settings_contract,
+)
 
 
 class WorkingHourSerializer(serializers.Serializer):
@@ -66,13 +68,10 @@ class TenantCreateSerializer(serializers.Serializer):
             return {}
         if not isinstance(value, dict):
             raise serializers.ValidationError("settings must be a JSON object.")
-        theme = value.get("theme")
-        if theme is not None:
-            try:
-                validate_tenant_branding(theme)
-            except ValueError as exc:
-                raise serializers.ValidationError({"theme": str(exc)}) from exc
-        return strip_phase1_deprecated_tenant_settings(value)
+        try:
+            return validate_tenant_settings_contract(value)
+        except TenantSettingsContractError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
     def to_internal_value(self, data):
         data = data.dict() if hasattr(data, "dict") else dict(data)

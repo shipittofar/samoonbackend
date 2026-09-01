@@ -1,5 +1,5 @@
-"""Tenant.settings persist as caller-owned JSON, except Phase 1/2/4A
-duplicated, computed, and unused ``features`` keys which are stripped on write.
+"""Tenant.settings persist as caller-owned JSON within the Phase 5B contract,
+except Phase 1/2/4A duplicated, computed, and unused keys which are stripped on write.
 """
 import uuid
 
@@ -102,11 +102,8 @@ class TenantSettingsCreateTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
 
-    def test_create_does_not_restrict_marketplace_field_shapes(self):
-        """A payload with an unconventional/unexpected value in a
-        marketplace field (e.g. rating as a string, an extra unknown key)
-        must not be rejected or stripped — settings is caller-owned JSON,
-        not a strict schema."""
+    def test_create_rejects_unknown_settings_keys(self):
+        """Unknown top-level and marketplace keys are rejected on API writes."""
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
@@ -122,8 +119,7 @@ class TenantSettingsCreateTests(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual(response.data["settings"], unconventional_settings)
+        self.assertEqual(response.status_code, 400, response.data)
 
     def test_create_strips_phase1_duplicated_settings_keys(self):
         user = make_user()
