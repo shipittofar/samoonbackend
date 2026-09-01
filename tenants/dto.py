@@ -73,6 +73,7 @@ class TenantDTO:
     business_types: list
     status: str
     is_active: bool
+    # Full stored JSON for cache/merge. HTTP serializers project, they do not dump this.
     settings: dict
     created_at: datetime
     updated_at: datetime
@@ -357,8 +358,9 @@ class TenantDiscoverDTO:
     Cached discover-list tenant row.
 
     Matches ``DiscoverTenantResponseSerializer`` inputs: identity fields,
-    settings (featureFlags / theme / marketplace source), and nested
-    public branches as ``BranchDiscoverDTO``.
+    settings (featureFlags / theme / marketplace source; full blob cached),
+    and nested public branches as ``BranchDiscoverDTO``. Discover responses
+    never dump the settings object.
     """
 
     id: UUID

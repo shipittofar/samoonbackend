@@ -7,8 +7,14 @@ from addresses.services.delivery_zone_service import DeliveryZoneResult
 
 class AddressCapabilitiesService:
     """
-    Derives address capabilities from typed branch columns, tenant settings,
-    and delivery zone evaluation. Extension overrides via settings JSON only.
+    Resolution order:
+
+    1. Branch / delivery-zone rules (typed operational fields)
+    2. Tenant or Branch ``addressCapabilities`` boolean overlay
+    3. computed capability result
+
+    Overlay keys are an open string → bool map. This is not a replacement
+    for Branch operational columns (delivery_enabled, etc.).
     """
 
     CAPABILITY_RULES = (

@@ -293,11 +293,10 @@ def validate_tenant_settings_contract(settings: Any) -> dict:
     return cleaned
 
 
-def project_public_tenant_settings(settings: Any) -> dict:
-    """Settings safe for public tenant list/retrieve (not a raw dump)."""
+def _project_settings(settings: Any, keys: frozenset[str]) -> dict:
     cleaned = strip_deprecated_tenant_settings(settings)
     projected: dict[str, Any] = {}
-    for key in PUBLIC_SETTINGS_KEYS:
+    for key in keys:
         if key not in cleaned:
             continue
         if key == "marketplace" and isinstance(cleaned["marketplace"], dict):
@@ -309,6 +308,22 @@ def project_public_tenant_settings(settings: Any) -> dict:
         else:
             projected[key] = cleaned[key]
     return projected
+
+
+def project_public_tenant_settings(settings: Any) -> dict:
+    """Settings safe for public tenant list/retrieve (not a raw dump)."""
+    return _project_settings(settings, PUBLIC_SETTINGS_KEYS)
+
+
+def project_owner_tenant_settings(settings: Any) -> dict:
+    """Console/owner settings: canonical allowlist, including internal keys.
+
+    Includes ``addressCapabilities`` and ``notificationMatrix``. Omits
+    stored extras and deprecated keys so authenticated responses cannot
+    echo an arbitrary JSON blob. Database extras are still preserved on
+    ``save()`` / settings patch merge.
+    """
+    return _project_settings(settings, ALLOWED_TOP_LEVEL_KEYS)
 
 
 def merge_settings_patch(existing: Any, patch: Any) -> dict:

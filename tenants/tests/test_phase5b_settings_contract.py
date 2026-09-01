@@ -13,6 +13,7 @@ from addresses.services.delivery_zone_service import DeliveryZoneResult
 from tenants.models import Branch, BranchStatus, Owner, Tenant, TenantStatus
 from tenants.settings_cleanup import (
     TenantSettingsContractError,
+    project_owner_tenant_settings,
     project_public_tenant_settings,
     strip_deprecated_tenant_settings,
     validate_tenant_settings_contract,
@@ -107,6 +108,17 @@ class SettingsContractUnitTests(SimpleTestCase):
         self.assertNotIn("addressCapabilities", projected)
         self.assertNotIn("notificationMatrix", projected)
 
+    def test_owner_projection_includes_internal_keys_not_extras(self):
+        projected = project_owner_tenant_settings({
+            **VALID_SETTINGS,
+            "legacyExtra": True,
+            "websiteBuilder": {"status": "draft"},
+        })
+        self.assertEqual(projected["notificationMatrix"], VALID_SETTINGS["notificationMatrix"])
+        self.assertTrue(projected["addressCapabilities"]["can_deliver"])
+        self.assertNotIn("legacyExtra", projected)
+        self.assertNotIn("websiteBuilder", projected)
+
     def test_save_path_preserves_unknown_stored_keys(self):
         stored = strip_deprecated_tenant_settings({
             "theme": {"primaryColor": "#123456"},
@@ -197,6 +209,7 @@ class SettingsContractAPITests(TestCase):
         tenant.refresh_from_db()
         self.assertTrue(tenant.settings["legacyExtra"])
         self.assertEqual(tenant.settings["contactEmail"], "keep@example.com")
+        self.assertNotIn("legacyExtra", response.data["settings"])
 
     def test_public_list_and_retrieve_omit_internal_settings(self):
         tenant = Tenant.objects.create(

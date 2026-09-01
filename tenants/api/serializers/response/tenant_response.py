@@ -6,7 +6,10 @@ from tenants.api.serializers.response.tenant_summary import (
     build_tenant_summary,
 )
 from tenants.models import WorkingHour
-from tenants.settings_cleanup import project_public_tenant_settings
+from tenants.settings_cleanup import (
+    project_owner_tenant_settings,
+    project_public_tenant_settings,
+)
 
 
 WEEKDAY_LABELS = dict(WorkingHour.Weekday.choices)
@@ -222,7 +225,7 @@ class TenantResponseSerializer(serializers.Serializer):
             raw = {}
         if self.context.get("public_settings"):
             return project_public_tenant_settings(raw)
-        return raw
+        return project_owner_tenant_settings(raw)
 
     def get_owner_id(self, obj):
         owner_user_id = getattr(obj, "owner_user_id", None)
