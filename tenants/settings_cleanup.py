@@ -269,8 +269,8 @@ def _validate_notification_matrix(matrix: Any) -> None:
 def validate_tenant_settings_contract(settings: Any) -> dict:
     """Strip deprecated keys, then reject unknown/malformed remaining keys.
 
-    Used for API create/update/settings-patch. Does not mutate stored extras
-    that never pass through an API serializer.
+    Shared by the Tenant API and Django Admin. Does not mutate stored extras
+    that never pass through this validator.
     """
     cleaned = strip_deprecated_tenant_settings(settings)
     _reject_unknown("settings", set(cleaned.keys()), ALLOWED_TOP_LEVEL_KEYS)
@@ -334,6 +334,24 @@ def merge_settings_patch(existing: Any, patch: Any) -> dict:
     merged = strip_deprecated_tenant_settings(existing)
     merged.update(validated_patch)
     return merged
+
+
+def replace_canonical_tenant_settings(existing: Any, submitted: Any) -> dict:
+    """Replace canonical keys with a validated payload; keep stored extras.
+
+    Django Admin presents only the allowlist. Saving must not delete unknown
+    production extras, and must not persist deprecated/domain-owned keys.
+    """
+    if not isinstance(submitted, dict):
+        raise TenantSettingsContractError("settings must be a JSON object.")
+    validated = validate_tenant_settings_contract(submitted)
+    preserved = strip_deprecated_tenant_settings(existing)
+    extras = {
+        key: value
+        for key, value in preserved.items()
+        if key not in ALLOWED_TOP_LEVEL_KEYS
+    }
+    return {**extras, **validated}
 
 
 # Backward-compatible name used by Phase 1 call sites.

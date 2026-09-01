@@ -4,6 +4,57 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
 from tenants.models import Owner, Tenant, Branch, WorkingHour
+from tenants.settings_cleanup import (
+    TenantSettingsContractError,
+    project_owner_tenant_settings,
+    replace_canonical_tenant_settings,
+)
+
+MAX_WORKING_HOURS_PER_BRANCH = 7
+
+TENANT_SETTINGS_HELP = _(
+    "Canonical Tenant.settings JSON: theme, featureFlags, addressCapabilities, "
+    "marketplace listing metadata, contactEmail, contactPhone, "
+    "notificationMatrix. featureFlags is an open UI/rollout map — not RBAC "
+    "and not Branch capabilities. addressCapabilities is an open boolean overlay. "
+    "Do not store Branch locale, checkout, hours, contact, Website Builder, or "
+    "computed marketplace fields. Legacy unknown keys are not shown and are "
+    "preserved on save."
+)
+
+
+class TenantAdminForm(forms.ModelForm):
+    """Raw JSON editor bounded by the Phase 5B/5C Tenant.settings contract."""
+
+    class Meta:
+        model = Tenant
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        settings_field = self.fields.get("settings")
+        if settings_field is None:
+            return
+        settings_field.help_text = TENANT_SETTINGS_HELP
+        settings_field.label = _("Settings (canonical JSON)")
+        if self.instance and self.instance.pk and not self.is_bound:
+            self.initial["settings"] = project_owner_tenant_settings(
+                self.instance.settings
+            )
+
+    def clean_settings(self):
+        value = self.cleaned_data.get("settings")
+        if value in (None, ""):
+            value = {}
+        if not isinstance(value, dict):
+            raise forms.ValidationError(_("settings must be a JSON object."))
+        try:
+            return replace_canonical_tenant_settings(
+                getattr(self.instance, "settings", None) or {},
+                value,
+            )
+        except TenantSettingsContractError as exc:
+            raise forms.ValidationError(str(exc)) from exc
 
 MAX_WORKING_HOURS_PER_BRANCH = 7
 
@@ -70,6 +121,7 @@ class OwnerAdmin(admin.ModelAdmin):
 
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
+    form = TenantAdminForm
     list_display = (
         "name",
         "owner",
@@ -90,7 +142,11 @@ class TenantAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("owner", "name", "slug", "business_types", "status", "is_active")}),
         (_("Business settings"), {
-         "fields": ("tax_percentage", "service_charge_percentage", "image", "settings")}),
+         "fields": ("tax_percentage", "service_charge_percentage", "image")}),
+        (_("Tenant settings"), {
+            "fields": ("settings",),
+            "description": TENANT_SETTINGS_HELP,
+        }),
         (_("Timestamps"), {"fields": ("created_at", "updated_at")}),
     )
 
