@@ -197,7 +197,8 @@ class RbacSessionBusinessLogicLayer:
             "first_name": user.first_name or "",
             "last_name": user.last_name or "",
             "avatar": avatar,
-            "is_verified": user.is_verified,
+            "is_verified": bool(user.is_verified),
+            "is_superuser": bool(user.is_superuser),
             "created_at": user.created_at,
         }
 

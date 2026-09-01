@@ -89,3 +89,63 @@ class MeContractTests(TestCase):
         self.assertEqual(assignment["status"], "active")
         self.assertIsNone(assignment["grantedBy"])
         self.assertEqual(assignment["branchIds"], "all")
+
+
+class MeIdentityFlagTests(TestCase):
+    def test_me_returns_is_superuser_and_is_verified(self):
+        user = make_user(is_superuser=True, is_verified=True)
+        client = APIClient()
+        client.force_authenticate(user=user)
+
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["user"]["is_superuser"])
+        self.assertTrue(response.data["user"]["is_verified"])
+
+    def test_me_returns_false_flags_for_tenant_owner(self):
+        owner_user, _tenant = make_tenant_with_owner()
+        client = APIClient()
+        client.force_authenticate(user=owner_user)
+
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["user"]["is_superuser"])
+        self.assertIn("is_verified", response.data["user"])
+
+    def test_password_login_then_me_preserves_identity_flags(self):
+        user = make_user(
+            is_superuser=True,
+            is_verified=True,
+            is_staff=True,
+        )
+        client = APIClient()
+        login = client.post(
+            "/api/auth/password-login/",
+            {"email": user.email, "password": "testpass123"},
+            format="json",
+        )
+        self.assertEqual(login.status_code, 200)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["user"]["is_superuser"])
+        self.assertTrue(response.data["user"]["is_verified"])
+
+    def test_staff_without_superuser_login_does_not_set_is_superuser(self):
+        user = make_user(is_staff=True, is_superuser=False, is_verified=True)
+        client = APIClient()
+        login = client.post(
+            "/api/auth/password-login/",
+            {"email": user.email, "password": "testpass123"},
+            format="json",
+        )
+        self.assertEqual(login.status_code, 200)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
+
+        response = client.get("/api/auth/me/")
+        self.assertFalse(response.data["user"]["is_superuser"])
+        self.assertTrue(response.data["user"]["is_verified"])

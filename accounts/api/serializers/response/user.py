@@ -27,7 +27,7 @@ class UserOutputSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "email", "phone_number", "first_name", "last_name",
-            "avatar", "role", "is_verified", "created_at",
+            "avatar", "role", "is_verified", "is_superuser", "created_at",
         ]
 
     def get_phone_number(self, obj):

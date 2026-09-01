@@ -335,7 +335,7 @@ class AuthTokenValidityTests(TestCase):
 class AuthMeUserProfileContractTests(TestCase):
     EXPECTED_USER_KEYS = {
         "id", "email", "accountType", "phone_number", "first_name",
-        "last_name", "avatar", "is_verified", "created_at",
+        "last_name", "avatar", "is_verified", "is_superuser", "created_at",
     }
 
     def test_normal_verified_user(self):
@@ -362,6 +362,7 @@ class AuthMeUserProfileContractTests(TestCase):
         self.assertEqual(user_payload["last_name"], "Lovelace")
         self.assertIsNone(user_payload["avatar"])
         self.assertTrue(user_payload["is_verified"])
+        self.assertFalse(user_payload["is_superuser"])
         self.assertIsNotNone(user_payload["created_at"])
 
     def test_unverified_user(self):
@@ -373,6 +374,29 @@ class AuthMeUserProfileContractTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["user"]["is_verified"])
+        self.assertFalse(response.json()["user"]["is_superuser"])
+
+    def test_django_superuser_flags(self):
+        user = make_user(is_superuser=True, is_staff=True, is_verified=True)
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["user"]
+        self.assertTrue(payload["is_superuser"])
+        self.assertTrue(payload["is_verified"])
+
+    def test_staff_without_superuser_is_not_platform_admin(self):
+        user = make_user(is_staff=True, is_superuser=False)
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["user"]["is_superuser"])
 
     def test_user_without_avatar(self):
         user = make_user()
