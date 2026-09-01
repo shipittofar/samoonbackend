@@ -260,7 +260,7 @@ class BranchAdmin(admin.ModelAdmin):
                 "default_payment_method",
             ),
         }),
-        (_("Marketplace"), {"fields": ("marketplace_visible",)}),
+        (_("Marketplace"), {"fields": ("marketplace_visible", "cuisines", "amenities")}),
         (_("Reservation"), {"fields": ("reservations_enabled", "max_capacity")}),
         (_("Advanced"), {"fields": ("settings", "metadata")}),
         (_("Timestamps"), {"fields": ("created_at", "updated_at")}),
