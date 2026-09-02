@@ -50,6 +50,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://78.157.60.7",
     "http://45.149.76.125:3000",
     "http://localhost:3000",
+    "http://localhost:4000",
     "http://localhost:8800",
     "http://77.221.156.197:8800",
 ]
@@ -61,6 +62,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://78.157.60.7",
     "http://78.157.60.7:3000",
     "http://localhost:3000",
+    "http://localhost:4000",
     "http://localhost:8800",
     "http://77.221.156.197:8800",
 ]
