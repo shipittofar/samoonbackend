@@ -39,6 +39,7 @@ class WorkingHourSerializer(serializers.Serializer):
 
 class TenantCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
 
     tax_percentage = serializers.DecimalField(
         max_digits=4, decimal_places=2,

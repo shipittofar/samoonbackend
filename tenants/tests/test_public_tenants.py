@@ -81,6 +81,7 @@ class PublicTenantListTests(TestCase):
                 "id",
                 "name",
                 "slug",
+                "description",
                 "image",
                 "discoverAvatar",
                 "discoverCover",
@@ -111,6 +112,7 @@ class PublicTenantListTests(TestCase):
 
         self.assertEqual(item["name"], "Full Fields Check")
         self.assertEqual(item["slug"], tenant.slug)
+        self.assertEqual(item["description"], "")
         self.assertEqual(item["status"], "active")
         self.assertEqual(item["business_types"], ["cafe", "bar"])
         self.assertEqual(str(item["tax_percentage"]), "7.50")
@@ -146,3 +148,15 @@ class PublicTenantListTests(TestCase):
         results = response.data["results"] if "results" in response.data else response.data
         for item in results:
             self.assertNotIn("type", item)
+
+    def test_public_list_exposes_tenant_description(self):
+        tenant = make_tenant(
+            name="Described Place",
+            description="Our business description",
+        )
+
+        client = APIClient()
+        response = client.get("/api/tenants/")
+        results = response.data["results"] if "results" in response.data else response.data
+        item = next(i for i in results if i["id"] == str(tenant.id))
+        self.assertEqual(item["description"], "Our business description")

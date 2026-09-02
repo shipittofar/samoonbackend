@@ -154,6 +154,7 @@ class PublicDiscoverListTests(TestCase):
                 "id",
                 "slug",
                 "name",
+                "description",
                 "is_active",
                 "status",
                 "created_at",
@@ -185,7 +186,7 @@ class PublicDiscoverListTests(TestCase):
         self.assertEqual(item["marketplace"]["branchCount"], 1)
         self.assertEqual(item["marketplace"]["primaryBranchSlug"], "main-branch")
         self.assertNotIn("branches", item["marketplace"])
-        self.assertNotIn("description", item)
+        self.assertEqual(item["description"], "")
         self.assertNotIn("cuisines", item["marketplace"])
         self.assertNotIn("amenities", item["marketplace"])
 
@@ -209,6 +210,60 @@ class PublicDiscoverListTests(TestCase):
         self.assertEqual(branch["cuisines"], ["Italian"])
         self.assertEqual(branch["amenities"], ["WiFi"])
         self.assertEqual(set(branch["location"].keys()), {"address", "city", "country"})
+
+    def test_discover_tenant_description_comes_from_tenant_not_branch(self):
+        tenant = make_tenant(description="Our business description")
+        make_branch(
+            tenant,
+            name="Primary",
+            slug="primary-branch",
+            is_default=True,
+            description="Frankfurt branch description",
+        )
+        make_branch(
+            tenant,
+            name="Other",
+            slug="other-branch",
+            is_default=False,
+            description="Second branch description",
+        )
+
+        response = self.client.get(DISCOVER_URL)
+        item = next(
+            row for row in response.data["results"] if row["id"] == str(tenant.id)
+        )
+
+        self.assertEqual(item["description"], "Our business description")
+        self.assertEqual(item["description"], tenant.description)
+        self.assertNotEqual(item["description"], "Frankfurt branch description")
+        self.assertNotEqual(item["description"], item["branches"][0].get("description"))
+        self.assertNotIn("description", item["branches"][0])
+        self.assertEqual(
+            item["marketplace"]["description"], "Frankfurt branch description"
+        )
+        self.assertIn("image", item)
+        self.assertIn("discoverAvatar", item)
+        self.assertIn("discoverCover", item)
+        self.assertIn("heroImage", item)
+        self.assertEqual(item["marketplace"]["primaryBranchSlug"], "primary-branch")
+        self.assertEqual(len(item["branches"]), 2)
+
+    def test_empty_tenant_description_is_not_filled_from_branch(self):
+        tenant = make_tenant(description="")
+        make_branch(
+            tenant,
+            name="Main",
+            is_default=True,
+            description="Branch about text",
+        )
+
+        response = self.client.get(DISCOVER_URL)
+        item = next(
+            row for row in response.data["results"] if row["id"] == str(tenant.id)
+        )
+
+        self.assertEqual(item["description"], "")
+        self.assertEqual(item["marketplace"]["description"], "Branch about text")
 
     def test_cuisines_and_amenities_come_from_branch_not_tenant_settings(self):
         tenant = make_tenant()

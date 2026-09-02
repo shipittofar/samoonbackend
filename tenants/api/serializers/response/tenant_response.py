@@ -208,6 +208,7 @@ class TenantResponseSerializer(serializers.Serializer):
     owner_id = serializers.SerializerMethodField()
     name = serializers.CharField(read_only=True)
     slug = serializers.CharField(read_only=True)
+    description = serializers.CharField(read_only=True, allow_blank=True)
     tax_percentage = serializers.DecimalField(max_digits=4, decimal_places=2, read_only=True)
     serviceChargePercentage = serializers.DecimalField(
         source="service_charge_percentage",
@@ -260,6 +261,7 @@ class PublicTenantResponseSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     name = serializers.CharField(read_only=True)
     slug = serializers.CharField(read_only=True)
+    description = serializers.CharField(read_only=True, allow_blank=True)
     image = serializers.SerializerMethodField()
     discoverAvatar = serializers.SerializerMethodField()
     discoverCover = serializers.SerializerMethodField()

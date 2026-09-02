@@ -140,7 +140,7 @@ class TenantAdmin(admin.ModelAdmin):
     readonly_fields = ("slug", "created_at", "updated_at")
     inlines = (BranchInline,)
     fieldsets = (
-        (None, {"fields": ("owner", "name", "slug", "business_types", "status", "is_active")}),
+        (None, {"fields": ("owner", "name", "slug", "description", "business_types", "status", "is_active")}),
         (_("Business settings"), {
          "fields": ("tax_percentage", "service_charge_percentage", "image",
                     "discover_avatar", "discover_cover", "hero_image")}),

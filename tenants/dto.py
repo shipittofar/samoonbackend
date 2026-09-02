@@ -66,6 +66,7 @@ class TenantDTO:
     owner_user_id: UUID
     name: str
     slug: str
+    description: str
     tax_percentage: Decimal
     service_charge_percentage: Decimal
     image: str | None
@@ -93,6 +94,7 @@ class TenantDTO:
             owner_user_id=owner.user_id,
             name=tenant.name,
             slug=tenant.slug,
+            description=tenant.description or "",
             tax_percentage=tenant.tax_percentage,
             service_charge_percentage=tenant.service_charge_percentage,
             image=_image_name(tenant.image),
@@ -118,6 +120,7 @@ class TenantDTO:
     def from_cache_dict(cls, data: dict[str, Any]) -> TenantDTO:
         payload = dict(data)
         payload.setdefault("is_active", False)
+        payload.setdefault("description", "")
         payload.setdefault("discover_avatar", None)
         payload.setdefault("discover_avatar_url", None)
         payload.setdefault("discover_cover", None)
@@ -396,6 +399,7 @@ class TenantDiscoverDTO:
     id: UUID
     slug: str
     name: str
+    description: str
     is_active: bool
     status: str
     created_at: datetime
@@ -417,6 +421,7 @@ class TenantDiscoverDTO:
             id=tenant.id,
             slug=tenant.slug,
             name=tenant.name,
+            description=tenant.description or "",
             is_active=tenant.is_active,
             status=tenant.status,
             created_at=tenant.created_at,
@@ -458,4 +463,5 @@ class TenantDiscoverDTO:
         payload.setdefault("hero_image_url", None)
         payload.setdefault("is_active", False)
         payload.setdefault("status", "inactive")
+        payload.setdefault("description", "")
         return cls(**payload)

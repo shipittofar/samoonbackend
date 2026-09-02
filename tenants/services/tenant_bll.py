@@ -110,6 +110,8 @@ class TenantBusinessLogicLayer:
             raise DuplicateTenantException()
 
         tenant.name = data["name"]
+        if "description" in data:
+            tenant.description = data["description"]
         tenant.tax_percentage = data.get(
             "tax_percentage", tenant.tax_percentage)
         tenant.service_charge_percentage = data.get(
@@ -122,6 +124,8 @@ class TenantBusinessLogicLayer:
             "name", "tax_percentage", "service_charge_percentage",
             "business_types", "status", "settings", "updated_at",
         ]
+        if "description" in data:
+            update_fields.append("description")
 
         if data.get("image") is not None:
             tenant.image = data["image"]

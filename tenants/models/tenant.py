@@ -57,6 +57,7 @@ class Tenant(WebPImageMixin, models.Model):
     )
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, max_length=100, blank=True)
+    description = models.TextField(blank=True)
     tax_percentage = models.DecimalField(
         max_digits=4, decimal_places=2, default=0,
         validators=[MinValueValidator(0), MaxValueValidator(100)],

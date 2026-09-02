@@ -63,6 +63,7 @@ class DiscoverTenantResponseSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     slug = serializers.CharField(read_only=True)
     name = serializers.CharField(read_only=True)
+    description = serializers.CharField(read_only=True, allow_blank=True)
     is_active = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
