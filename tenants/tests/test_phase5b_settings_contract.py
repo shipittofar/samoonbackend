@@ -92,7 +92,7 @@ class SettingsContractUnitTests(SimpleTestCase):
             "currency": "EUR",
             "features": {"menu": True},
             "theme": {"primaryColor": "#123456"},
-            "marketplace": {"tagline": "Keep", "city": "NYC", "openNow": True},
+            "marketplace": {"tagline": "Keep", "city": "NYC", "openNow": True, "heroImage": "https://example.com/h.jpg"},
         })
         self.assertEqual(
             cleaned,

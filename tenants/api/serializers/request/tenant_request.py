@@ -53,6 +53,9 @@ class TenantCreateSerializer(serializers.Serializer):
     )
 
     image = serializers.ImageField(required=False, allow_null=True)
+    discover_avatar = serializers.ImageField(required=False, allow_null=True)
+    discover_cover = serializers.ImageField(required=False, allow_null=True)
+    hero_image = serializers.ImageField(required=False, allow_null=True)
 
     business_types = BusinessTypesField(required=False, default=list)
     status = serializers.ChoiceField(
@@ -81,6 +84,13 @@ class TenantCreateSerializer(serializers.Serializer):
 
         if "serviceChargePercentage" in data and "service_charge_percentage" not in data:
             data["service_charge_percentage"] = data.pop("serviceChargePercentage")
+
+        if "discoverAvatar" in data and "discover_avatar" not in data:
+            data["discover_avatar"] = data["discoverAvatar"]
+        if "discoverCover" in data and "discover_cover" not in data:
+            data["discover_cover"] = data["discoverCover"]
+        if "heroImage" in data and "hero_image" not in data:
+            data["hero_image"] = data["heroImage"]
 
         settings_raw = data.get("settings")
         if isinstance(settings_raw, str):
@@ -223,6 +233,13 @@ class BranchConsoleCreateSerializer(serializers.Serializer):
     maxCapacity = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     cuisines = serializers.ListField(child=serializers.CharField(), required=False, default=list)
     amenities = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    image = serializers.ImageField(required=False, allow_null=True)
+    coverImage = serializers.ImageField(
+        required=False, allow_null=True, source="cover_image",
+    )
+    heroImage = serializers.ImageField(
+        required=False, allow_null=True, source="hero_image",
+    )
 
     def validate_businessHours(self, value):
         days = [entry["day"] for entry in value]
@@ -368,6 +385,7 @@ class BranchCreateSerializer(serializers.Serializer):
     # --- media ---
     image = serializers.ImageField(required=False, allow_null=True)
     cover_image = serializers.ImageField(required=False, allow_null=True)
+    hero_image = serializers.ImageField(required=False, allow_null=True)
 
     # --- locale ---
     time_zone = serializers.CharField(required=False, allow_blank=True, max_length=64, default="UTC")
@@ -438,6 +456,11 @@ class BranchCreateSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         data = data.dict() if hasattr(data, "dict") else dict(data)
 
+        if "coverImage" in data and "cover_image" not in data:
+            data["cover_image"] = data["coverImage"]
+        if "heroImage" in data and "hero_image" not in data:
+            data["hero_image"] = data["heroImage"]
+
         # multipart/form-data sends these as JSON strings — decode before validation
         for field in ("working_hours", "settings", "metadata", "cuisines", "amenities"):
             raw = data.get(field)
@@ -463,6 +486,9 @@ class BranchConsoleUpdateSerializer(BranchConsoleCreateSerializer):
     image = serializers.ImageField(required=False, allow_null=True)
     coverImage = serializers.ImageField(
         required=False, allow_null=True, source="cover_image",
+    )
+    heroImage = serializers.ImageField(
+        required=False, allow_null=True, source="hero_image",
     )
 
     _JSON_STRING_FIELDS = (
@@ -524,7 +550,7 @@ class BranchConsoleUpdateSerializer(BranchConsoleCreateSerializer):
     def to_internal_value(self, data):
         data = data.dict() if hasattr(data, "dict") else dict(data)
 
-        for field in ("image", "coverImage", "cover_image"):
+        for field in ("image", "coverImage", "cover_image", "heroImage", "hero_image"):
             if data.get(field) == "":
                 data.pop(field, None)
 

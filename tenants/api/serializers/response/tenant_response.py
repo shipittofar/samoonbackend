@@ -156,6 +156,7 @@ class BranchResponseSerializer(BranchCheckoutResponseMixin, serializers.Serializ
     settings = serializers.JSONField(read_only=True)
     image = serializers.SerializerMethodField()
     coverImage = serializers.SerializerMethodField()
+    heroImage = serializers.SerializerMethodField()
     isDefault = serializers.BooleanField(source="is_default", read_only=True)
     cuisines = serializers.ListField(child=serializers.CharField(), read_only=True)
     amenities = serializers.ListField(child=serializers.CharField(), read_only=True)
@@ -193,6 +194,9 @@ class BranchResponseSerializer(BranchCheckoutResponseMixin, serializers.Serializ
     def get_coverImage(self, obj):
         return _media_url(obj, "cover_image", "cover_image_url")
 
+    def get_heroImage(self, obj):
+        return _media_url(obj, "hero_image", "hero_image_url")
+
     def get_status(self, obj) -> str:
         if not obj.is_active:
             return "inactive"
@@ -212,6 +216,9 @@ class TenantResponseSerializer(serializers.Serializer):
         read_only=True,
     )
     image = serializers.SerializerMethodField()
+    discoverAvatar = serializers.SerializerMethodField()
+    discoverCover = serializers.SerializerMethodField()
+    heroImage = serializers.SerializerMethodField()
     business_types = BusinessTypesField(read_only=True)
     is_active = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
@@ -237,6 +244,15 @@ class TenantResponseSerializer(serializers.Serializer):
     def get_image(self, obj):
         return _media_url(obj, "image", "image_url")
 
+    def get_discoverAvatar(self, obj):
+        return _media_url(obj, "discover_avatar", "discover_avatar_url")
+
+    def get_discoverCover(self, obj):
+        return _media_url(obj, "discover_cover", "discover_cover_url")
+
+    def get_heroImage(self, obj):
+        return _media_url(obj, "hero_image", "hero_image_url")
+
 
 class PublicTenantResponseSerializer(serializers.Serializer):
     """Public discover-page contract for GET /api/tenants/."""
@@ -245,6 +261,9 @@ class PublicTenantResponseSerializer(serializers.Serializer):
     name = serializers.CharField(read_only=True)
     slug = serializers.CharField(read_only=True)
     image = serializers.SerializerMethodField()
+    discoverAvatar = serializers.SerializerMethodField()
+    discoverCover = serializers.SerializerMethodField()
+    heroImage = serializers.SerializerMethodField()
     business_types = BusinessTypesField(read_only=True)
     is_active = serializers.BooleanField(read_only=True)
     status = serializers.CharField(read_only=True)
@@ -258,3 +277,12 @@ class PublicTenantResponseSerializer(serializers.Serializer):
 
     def get_image(self, obj):
         return _media_url(obj, "image", "image_url")
+
+    def get_discoverAvatar(self, obj):
+        return _media_url(obj, "discover_avatar", "discover_avatar_url")
+
+    def get_discoverCover(self, obj):
+        return _media_url(obj, "discover_cover", "discover_cover_url")
+
+    def get_heroImage(self, obj):
+        return _media_url(obj, "hero_image", "hero_image_url")

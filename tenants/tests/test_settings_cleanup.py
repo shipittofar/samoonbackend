@@ -23,6 +23,7 @@ class StripPhase1DeprecatedTenantSettingsTests(SimpleTestCase):
                 "phone_number": "+1 555",
                 "description": "From settings",
                 "coverImage": "https://example.com/cover.jpg",
+                "heroImage": "https://example.com/hero.jpg",
                 "branches": [{"slug": "ignored"}],
                 "gallery": [],
                 "rating": 4.2,

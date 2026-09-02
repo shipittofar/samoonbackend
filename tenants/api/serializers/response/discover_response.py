@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from tenants.api.serializers.response.branding import TenantBrandingSerializer
+from tenants.api.serializers.response.tenant_response import _media_url
 from tenants.branding import (
     build_legacy_discover_theme,
     build_tenant_branding,
@@ -24,6 +25,8 @@ class DiscoverBranchResponseSerializer(serializers.Serializer):
     slug = serializers.CharField(read_only=True)
     name = serializers.CharField(read_only=True)
     image = serializers.SerializerMethodField()
+    coverImage = serializers.SerializerMethodField()
+    heroImage = serializers.SerializerMethodField()
     cuisines = serializers.ListField(child=serializers.CharField(), read_only=True)
     amenities = serializers.ListField(child=serializers.CharField(), read_only=True)
     openNow = serializers.SerializerMethodField()
@@ -31,7 +34,13 @@ class DiscoverBranchResponseSerializer(serializers.Serializer):
     location = DiscoverBranchLocationResponseSerializer(source="*", read_only=True)
 
     def get_image(self, obj) -> str | None:
-        return getattr(obj, "image_url", None)
+        return _media_url(obj, "image", "image_url")
+
+    def get_coverImage(self, obj) -> str | None:
+        return _media_url(obj, "cover_image", "cover_image_url")
+
+    def get_heroImage(self, obj) -> str | None:
+        return _media_url(obj, "hero_image", "hero_image_url")
 
     def _availability_cache(self) -> dict:
         return self.context.setdefault("branch_availability_cache", {})
@@ -58,6 +67,9 @@ class DiscoverTenantResponseSerializer(serializers.Serializer):
     status = serializers.CharField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
     image = serializers.SerializerMethodField()
+    discoverAvatar = serializers.SerializerMethodField()
+    discoverCover = serializers.SerializerMethodField()
+    heroImage = serializers.SerializerMethodField()
     businessTypes = serializers.SerializerMethodField()
     featureFlags = serializers.SerializerMethodField()
     branding = serializers.SerializerMethodField()
@@ -79,6 +91,15 @@ class DiscoverTenantResponseSerializer(serializers.Serializer):
 
     def get_image(self, obj) -> str | None:
         return resolve_tenant_image_url(obj)
+
+    def get_discoverAvatar(self, obj) -> str | None:
+        return _media_url(obj, "discover_avatar", "discover_avatar_url")
+
+    def get_discoverCover(self, obj) -> str | None:
+        return _media_url(obj, "discover_cover", "discover_cover_url")
+
+    def get_heroImage(self, obj) -> str | None:
+        return _media_url(obj, "hero_image", "hero_image_url")
 
     def get_branding(self, obj) -> dict:
         branding = build_tenant_branding(obj)

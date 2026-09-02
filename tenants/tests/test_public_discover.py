@@ -158,6 +158,9 @@ class PublicDiscoverListTests(TestCase):
                 "status",
                 "created_at",
                 "image",
+                "discoverAvatar",
+                "discoverCover",
+                "heroImage",
                 "businessTypes",
                 "featureFlags",
                 "branding",
@@ -177,7 +180,7 @@ class PublicDiscoverListTests(TestCase):
         self.assertEqual(item["marketplace"]["city"], "Brooklyn")
         self.assertEqual(item["marketplace"]["email"], "branch@example.com")
         self.assertEqual(item["marketplace"]["phone_number"], "+15551001001")
-        self.assertIsNone(item["marketplace"]["coverImage"])
+        self.assertNotIn("coverImage", item["marketplace"])
         self.assertEqual(item["marketplace"]["rating"], 4.5)
         self.assertEqual(item["marketplace"]["branchCount"], 1)
         self.assertEqual(item["marketplace"]["primaryBranchSlug"], "main-branch")
@@ -194,6 +197,8 @@ class PublicDiscoverListTests(TestCase):
                 "slug",
                 "name",
                 "image",
+                "coverImage",
+                "heroImage",
                 "cuisines",
                 "amenities",
                 "openNow",

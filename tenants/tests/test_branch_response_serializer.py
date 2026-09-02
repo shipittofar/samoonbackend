@@ -204,3 +204,12 @@ class BranchResponseSerializerCheckoutTests(TestCase):
         self.assertIsNone(checkout["payments"]["default"])
         self.assertIsNone(checkout["delivery"]["radius"])
         self.assertIsNone(checkout["delivery"]["minimumOrder"])
+
+    def test_image_fields_are_independent_and_avatar_is_absent(self):
+        self.assertIn("image", self.data)
+        self.assertIn("coverImage", self.data)
+        self.assertIn("heroImage", self.data)
+        self.assertNotIn("avatar", self.data)
+        self.assertIsNone(self.data["image"])
+        self.assertIsNone(self.data["coverImage"])
+        self.assertIsNone(self.data["heroImage"])

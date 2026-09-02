@@ -70,6 +70,12 @@ class TenantDTO:
     service_charge_percentage: Decimal
     image: str | None
     image_url: str | None
+    discover_avatar: str | None
+    discover_avatar_url: str | None
+    discover_cover: str | None
+    discover_cover_url: str | None
+    hero_image: str | None
+    hero_image_url: str | None
     business_types: list
     status: str
     is_active: bool
@@ -91,6 +97,12 @@ class TenantDTO:
             service_charge_percentage=tenant.service_charge_percentage,
             image=_image_name(tenant.image),
             image_url=_image_url(tenant.image),
+            discover_avatar=_image_name(tenant.discover_avatar),
+            discover_avatar_url=_image_url(tenant.discover_avatar),
+            discover_cover=_image_name(tenant.discover_cover),
+            discover_cover_url=_image_url(tenant.discover_cover),
+            hero_image=_image_name(tenant.hero_image),
+            hero_image_url=_image_url(tenant.hero_image),
             business_types=list(tenant.business_types or []),
             status=tenant.status,
             is_active=tenant.is_active,
@@ -106,6 +118,12 @@ class TenantDTO:
     def from_cache_dict(cls, data: dict[str, Any]) -> TenantDTO:
         payload = dict(data)
         payload.setdefault("is_active", False)
+        payload.setdefault("discover_avatar", None)
+        payload.setdefault("discover_avatar_url", None)
+        payload.setdefault("discover_cover", None)
+        payload.setdefault("discover_cover_url", None)
+        payload.setdefault("hero_image", None)
+        payload.setdefault("hero_image_url", None)
         return cls(**payload)
 
 
@@ -144,6 +162,8 @@ class BranchDTO:
     image_url: str | None
     cover_image: str | None
     cover_image_url: str | None
+    hero_image: str | None
+    hero_image_url: str | None
     time_zone: str
     currency: str
     language: str
@@ -215,6 +235,8 @@ class BranchDTO:
             image_url=_image_url(branch.image),
             cover_image=_image_name(branch.cover_image),
             cover_image_url=_image_url(branch.cover_image),
+            hero_image=_image_name(branch.hero_image),
+            hero_image_url=_image_url(branch.hero_image),
             time_zone=branch.time_zone or "UTC",
             currency=branch.currency or "USD",
             language=branch.language or "en",
@@ -267,6 +289,8 @@ class BranchDTO:
         payload.setdefault("tenant_status", "inactive")
         payload.setdefault("cuisines", [])
         payload.setdefault("amenities", [])
+        payload.setdefault("hero_image", None)
+        payload.setdefault("hero_image_url", None)
         return cls(**payload)
 
 
@@ -298,6 +322,8 @@ class BranchDiscoverDTO:
     description: str = ""
     cover_image: str | None = None
     cover_image_url: str | None = None
+    hero_image: str | None = None
+    hero_image_url: str | None = None
     cuisines: list = field(default_factory=list)
     amenities: list = field(default_factory=list)
     working_hours: list[WorkingHourDTO] = field(default_factory=list)
@@ -323,6 +349,8 @@ class BranchDiscoverDTO:
             description=branch.description or "",
             cover_image=_image_name(branch.cover_image),
             cover_image_url=_image_url(branch.cover_image),
+            hero_image=_image_name(branch.hero_image),
+            hero_image_url=_image_url(branch.hero_image),
             cuisines=list(branch.cuisines or []),
             amenities=list(branch.amenities or []),
             working_hours=[
@@ -349,6 +377,8 @@ class BranchDiscoverDTO:
         payload.setdefault("description", "")
         payload.setdefault("cover_image", None)
         payload.setdefault("cover_image_url", None)
+        payload.setdefault("hero_image", None)
+        payload.setdefault("hero_image_url", None)
         return cls(**payload)
 
 
@@ -373,6 +403,12 @@ class TenantDiscoverDTO:
     settings: dict
     image: str | None
     image_url: str | None
+    discover_avatar: str | None = None
+    discover_avatar_url: str | None = None
+    discover_cover: str | None = None
+    discover_cover_url: str | None = None
+    hero_image: str | None = None
+    hero_image_url: str | None = None
     branches: list[BranchDiscoverDTO] = field(default_factory=list)
 
     @classmethod
@@ -388,6 +424,12 @@ class TenantDiscoverDTO:
             settings=dict(tenant.settings or {}),
             image=_image_name(tenant.image),
             image_url=_image_url(tenant.image),
+            discover_avatar=_image_name(tenant.discover_avatar),
+            discover_avatar_url=_image_url(tenant.discover_avatar),
+            discover_cover=_image_name(tenant.discover_cover),
+            discover_cover_url=_image_url(tenant.discover_cover),
+            hero_image=_image_name(tenant.hero_image),
+            hero_image_url=_image_url(tenant.hero_image),
             branches=[
                 BranchDiscoverDTO.from_model(branch)
                 for branch in tenant.branches.all()
@@ -408,6 +450,12 @@ class TenantDiscoverDTO:
         payload["branches"] = branches
         payload.setdefault("image", None)
         payload.setdefault("image_url", None)
+        payload.setdefault("discover_avatar", None)
+        payload.setdefault("discover_avatar_url", None)
+        payload.setdefault("discover_cover", None)
+        payload.setdefault("discover_cover_url", None)
+        payload.setdefault("hero_image", None)
+        payload.setdefault("hero_image_url", None)
         payload.setdefault("is_active", False)
         payload.setdefault("status", "inactive")
         return cls(**payload)

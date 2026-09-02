@@ -265,6 +265,9 @@ class BranchConsoleUpdateAPIView(APIView):
             cover_image_provided=(
                 "coverImage" in request.data or "cover_image" in request.data
             ),
+            hero_image_provided=(
+                "heroImage" in request.data or "hero_image" in request.data
+            ),
             **serializer.validated_data,
         )
 

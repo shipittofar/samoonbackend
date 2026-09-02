@@ -150,7 +150,7 @@ class Phase2DiscoverOwnershipTests(TestCase):
         self.assertEqual(marketplace["email"], "branch@example.com")
         self.assertEqual(marketplace["phone_number"], "+15550001111")
         self.assertEqual(marketplace["description"], "Branch description")
-        self.assertIsNone(marketplace["coverImage"])
+        self.assertNotIn("coverImage", marketplace)
         self.assertEqual(marketplace["tagline"], "Keep tagline")
         self.assertEqual(marketplace["rating"], 4.1)
         self.assertNotIn("branches", marketplace)

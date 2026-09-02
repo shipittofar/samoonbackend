@@ -126,6 +126,15 @@ class TenantBusinessLogicLayer:
         if data.get("image") is not None:
             tenant.image = data["image"]
             update_fields.append("image")
+        if data.get("discover_avatar") is not None:
+            tenant.discover_avatar = data["discover_avatar"]
+            update_fields.append("discover_avatar")
+        if data.get("discover_cover") is not None:
+            tenant.discover_cover = data["discover_cover"]
+            update_fields.append("discover_cover")
+        if data.get("hero_image") is not None:
+            tenant.hero_image = data["hero_image"]
+            update_fields.append("hero_image")
 
         try:
             tenant.save(update_fields=update_fields)
@@ -319,6 +328,8 @@ class BranchBusinessLogicLayer:
             branch.image = data["image"]
         if "cover_image" in data:
             branch.cover_image = data["cover_image"]
+        if "hero_image" in data:
+            branch.hero_image = data["hero_image"]
 
         branch.time_zone = data.get("time_zone", "UTC")
         branch.currency = data.get("currency", "USD")
@@ -340,7 +351,7 @@ class BranchBusinessLogicLayer:
             "name", "type", "manager",
             "phone", "email", "website",
             "address", "city", "country", "postal_code", "latitude", "longitude",
-            "image", "cover_image",
+            "image", "cover_image", "hero_image",
             "time_zone", "currency", "language",
             "settings", "metadata",
             "status", "is_active", "is_default",
@@ -367,6 +378,7 @@ class BranchBusinessLogicLayer:
         *,
         image_provided: bool = False,
         cover_image_provided: bool = False,
+        hero_image_provided: bool = False,
         **data,
     ) -> Branch:
         branch = branch_dal.get_branch_for_update(branch_id)
@@ -428,6 +440,12 @@ class BranchBusinessLogicLayer:
                 branch.cover_image.delete(save=False)
             branch.cover_image = data.get("cover_image")
             update_fields.append("cover_image")
+
+        if hero_image_provided:
+            if branch.hero_image:
+                branch.hero_image.delete(save=False)
+            branch.hero_image = data.get("hero_image")
+            update_fields.append("hero_image")
 
         if "settings" in data:
             branch.settings = _merge_extension_settings(

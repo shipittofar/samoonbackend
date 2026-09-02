@@ -142,7 +142,8 @@ class TenantAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("owner", "name", "slug", "business_types", "status", "is_active")}),
         (_("Business settings"), {
-         "fields": ("tax_percentage", "service_charge_percentage", "image")}),
+         "fields": ("tax_percentage", "service_charge_percentage", "image",
+                    "discover_avatar", "discover_cover", "hero_image")}),
         (_("Tenant settings"), {
             "fields": ("settings",),
             "description": TENANT_SETTINGS_HELP,
@@ -230,7 +231,7 @@ class BranchAdmin(admin.ModelAdmin):
         (_("Contact"), {"fields": ("phone", "email", "website")}),
         (_("Location"), {"fields": ("address", "city",
          "country", "postal_code", "latitude", "longitude")}),
-        (_("Media"), {"fields": ("image", "cover_image")}),
+        (_("Media"), {"fields": ("image", "cover_image", "hero_image")}),
         (_("Locale"), {"fields": ("time_zone", "currency", "language")}),
         (_("Checkout"), {
             "fields": (

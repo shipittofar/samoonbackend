@@ -70,6 +70,15 @@ class Tenant(WebPImageMixin, models.Model):
         help_text="Service charge percentage applied to dine-in orders (e.g. 10 for 10%)",
     )
     image = models.ImageField(upload_to="tenant_images/", null=True, blank=True)
+    discover_avatar = models.ImageField(
+        upload_to="tenant_discover_avatars/", null=True, blank=True,
+    )
+    discover_cover = models.ImageField(
+        upload_to="tenant_discover_covers/", null=True, blank=True,
+    )
+    hero_image = models.ImageField(
+        upload_to="tenant_heroes/", null=True, blank=True,
+    )
     business_types = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, choices=TenantStatus.choices, default=TenantStatus.INACTIVE)
     is_active = models.BooleanField(
@@ -174,6 +183,7 @@ class Branch(WebPImageMixin, models.Model):
     # --- media ---
     image = models.ImageField(upload_to="branch_images/", null=True, blank=True)
     cover_image = models.ImageField(upload_to="branch_covers/", null=True, blank=True)
+    hero_image = models.ImageField(upload_to="branch_heroes/", null=True, blank=True)
 
     # --- locale ---
     time_zone = models.CharField(max_length=64, blank=True, default="UTC")

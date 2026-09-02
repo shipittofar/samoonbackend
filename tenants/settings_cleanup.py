@@ -52,7 +52,16 @@ PHASE2_MARKETPLACE_KEYS = frozenset({
     "branches",
 })
 
-DEPRECATED_MARKETPLACE_KEYS = PHASE1_MARKETPLACE_KEYS | PHASE2_MARKETPLACE_KEYS
+# Tenant Hero moved to Tenant.hero_image; strip leftover marketplace copies.
+PHASE_TENANT_HERO_MARKETPLACE_KEYS = frozenset({
+    "heroImage",
+})
+
+DEPRECATED_MARKETPLACE_KEYS = (
+    PHASE1_MARKETPLACE_KEYS
+    | PHASE2_MARKETPLACE_KEYS
+    | PHASE_TENANT_HERO_MARKETPLACE_KEYS
+)
 
 ALLOWED_TOP_LEVEL_KEYS = frozenset({
     "theme",
@@ -82,7 +91,6 @@ MARKETPLACE_ALLOWED_KEYS = frozenset({
     "story",
     "website",
     "socialLinks",
-    "heroImage",
     "popular",
     "isNew",
 })
@@ -202,8 +210,6 @@ def _validate_marketplace(marketplace: Any) -> None:
         raise TenantSettingsContractError("marketplace.story must be a string.")
     if "website" in marketplace and not isinstance(marketplace["website"], str):
         raise TenantSettingsContractError("marketplace.website must be a string.")
-    if "heroImage" in marketplace and not isinstance(marketplace["heroImage"], str):
-        raise TenantSettingsContractError("marketplace.heroImage must be a string.")
     for flag_key in ("featured", "popular", "isNew"):
         if flag_key in marketplace and not isinstance(marketplace[flag_key], bool):
             raise TenantSettingsContractError(

@@ -248,6 +248,74 @@ class BranchConsoleUpdateAPITests(TestCase):
         self.branch.refresh_from_db()
         self.assertFalse(self.branch.cover_image)
 
+    def test_patch_cover_does_not_modify_logo_or_hero(self):
+        self.branch.image = SimpleUploadedFile(
+            "logo.jpg", _jpeg_bytes(), content_type="image/jpeg",
+        )
+        self.branch.hero_image = SimpleUploadedFile(
+            "hero.jpg", _jpeg_bytes(color=(10, 20, 30)), content_type="image/jpeg",
+        )
+        self.branch.save(update_fields=["image", "hero_image"])
+        logo_name = self.branch.image.name
+        hero_name = self.branch.hero_image.name
+
+        response = self.client.patch(
+            self.url,
+            {"coverImage": SimpleUploadedFile(
+                "cover.jpg", _jpeg_bytes(color=(1, 2, 3)), content_type="image/jpeg",
+            )},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.branch.refresh_from_db()
+        self.assertTrue(self.branch.cover_image)
+        self.assertEqual(self.branch.image.name, logo_name)
+        self.assertEqual(self.branch.hero_image.name, hero_name)
+        self.assertNotIn("avatar", response.json())
+
+    def test_patch_hero_does_not_modify_logo_or_cover(self):
+        self.branch.image = SimpleUploadedFile(
+            "logo.jpg", _jpeg_bytes(), content_type="image/jpeg",
+        )
+        self.branch.cover_image = SimpleUploadedFile(
+            "cover.jpg", _jpeg_bytes(color=(50, 100, 200)), content_type="image/jpeg",
+        )
+        self.branch.save(update_fields=["image", "cover_image"])
+        logo_name = self.branch.image.name
+        cover_name = self.branch.cover_image.name
+
+        response = self.client.patch(
+            self.url,
+            {"heroImage": SimpleUploadedFile(
+                "hero.jpg", _jpeg_bytes(color=(9, 8, 7)), content_type="image/jpeg",
+            )},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.branch.refresh_from_db()
+        self.assertTrue(self.branch.hero_image)
+        self.assertEqual(self.branch.image.name, logo_name)
+        self.assertEqual(self.branch.cover_image.name, cover_name)
+
+    def test_patch_empty_hero_image_string_clears_hero_image(self):
+        self.branch.hero_image = SimpleUploadedFile(
+            "hero.jpg", _jpeg_bytes(color=(9, 8, 7)), content_type="image/jpeg",
+        )
+        self.branch.save(update_fields=["hero_image"])
+        self.assertTrue(self.branch.hero_image)
+
+        response = self.client.patch(
+            self.url,
+            {"heroImage": ""},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.branch.refresh_from_db()
+        self.assertFalse(self.branch.hero_image)
+
     def test_patch_partial_update_preserves_unsent_fields(self):
         original_name = self.branch.name
         original_city = self.branch.city

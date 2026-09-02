@@ -10,8 +10,9 @@ MARKETPLACE_COMPUTED_FIELDS = frozenset({
 })
 
 # Branch-owned fields — not stored on tenant marketplace metadata.
-# Discover overlays city/email/phone/description/coverImage from the
-# primary public branch so stale settings cannot win.
+# Discover overlays city/email/phone/description from the primary public
+# branch so stale settings cannot win. Cover/hero/logo images are never
+# derived from a branch for the tenant listing.
 MARKETPLACE_BRANCH_OWNED_FIELDS = frozenset({
     "cuisines",
     "amenities",
@@ -63,7 +64,6 @@ def _apply_primary_branch_listing_fields(marketplace: dict, branches: list) -> N
     marketplace["email"] = getattr(primary, "email", "") or ""
     marketplace["phone_number"] = getattr(primary, "phone", "") or ""
     marketplace["description"] = getattr(primary, "description", "") or ""
-    marketplace["coverImage"] = getattr(primary, "cover_image_url", None)
 
 
 def build_marketplace_metadata(
@@ -78,6 +78,7 @@ def build_marketplace_metadata(
         for key, value in stored.items()
         if key not in MARKETPLACE_COMPUTED_FIELDS
         and key not in MARKETPLACE_BRANCH_OWNED_FIELDS
+        and key != "heroImage"
     }
 
     _apply_primary_branch_listing_fields(marketplace, branches)
