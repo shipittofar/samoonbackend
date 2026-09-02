@@ -210,7 +210,7 @@ ADDRESSES_SUPPORT_STAFF_READ_ONLY = os.getenv(
 ).lower() in ("1", "true", "yes")
 SPECTACULAR_SETTINGS = {
     "TITLE": "Samoon API",
-    "VERSION": "1.19.2",
+    "VERSION": "1.19.4",
     "COMPONENT_SPLIT_REQUEST": True,
     "SWAGGER_UI_SETTINGS": {
         "docExpansion": "none",
