@@ -118,6 +118,7 @@ class AuthMeTenantIdAndSlugTests(TestCase):
         self.assertEqual(response.status_code, 200)
         membership_payload = response.json()["memberships"][0]
         self.assertEqual(membership_payload["tenantId"], str(tenant.id))
+        self.assertEqual(membership_payload["tenantName"], tenant.name)
         self.assertEqual(membership_payload["tenantSlug"], tenant.slug)
 
         # tenantId from /auth/me/ must resolve the UUID detail endpoint.

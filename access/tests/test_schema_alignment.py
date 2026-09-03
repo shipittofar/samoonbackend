@@ -108,6 +108,7 @@ class AuthMeTests(TestCase):
 
         membership_payload = body["memberships"][0]
         self.assertEqual(membership_payload["tenantId"], str(tenant.id))
+        self.assertEqual(membership_payload["tenantName"], tenant.name)
         self.assertEqual(membership_payload["tenantSlug"], tenant.slug)
         self.assertEqual(membership_payload["roles"], ["owner"])
         self.assertEqual(membership_payload["branchAccess"], {"scope": "all"})
@@ -140,6 +141,59 @@ class AuthMeTests(TestCase):
         client = APIClient()
         response = client.get("/api/auth/me/")
         self.assertEqual(response.status_code, 401)
+
+    def test_me_memberships_include_independent_tenant_names(self):
+        user, tenant_a = make_owner_tenant(name="Samoon Restaurant")
+        tenant_b = Tenant.objects.create(
+            owner=tenant_a.owner,
+            name="Brew Cafe",
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        names_by_id = {
+            m["tenantId"]: m["tenantName"] for m in response.json()["memberships"]
+        }
+        self.assertEqual(names_by_id[str(tenant_a.id)], "Samoon Restaurant")
+        self.assertEqual(names_by_id[str(tenant_b.id)], "Brew Cafe")
+        self.assertNotEqual(
+            names_by_id[str(tenant_a.id)], names_by_id[str(tenant_b.id)]
+        )
+
+    def test_me_tenant_name_reflects_live_tenant_name(self):
+        user, tenant = make_owner_tenant(name="Original Name")
+        tenant.name = "Updated Name"
+        tenant.save(update_fields=["name"])
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        membership = response.json()["memberships"][0]
+        self.assertEqual(membership["tenantName"], "Updated Name")
+        self.assertEqual(membership["tenantName"], tenant.name)
+
+    def test_me_staff_memberships_include_independent_tenant_names(self):
+        _owner_a, tenant_a = make_owner_tenant(name="Samoon Restaurant")
+        _owner_b, tenant_b = make_owner_tenant(name="Brew Cafe")
+        staff_user = make_user()
+        make_staff_membership(staff_user, tenant_a, roles=["waiter"])
+        make_staff_membership(staff_user, tenant_b, roles=["waiter"])
+
+        client = APIClient()
+        client.force_authenticate(user=staff_user)
+        response = client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        names_by_id = {
+            m["tenantId"]: m["tenantName"] for m in response.json()["memberships"]
+        }
+        self.assertEqual(names_by_id[str(tenant_a.id)], "Samoon Restaurant")
+        self.assertEqual(names_by_id[str(tenant_b.id)], "Brew Cafe")
 
 
 class TenantIsolationTests(TestCase):

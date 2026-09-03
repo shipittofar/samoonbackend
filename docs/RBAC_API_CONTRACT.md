@@ -109,6 +109,7 @@ Endpoints that return a **bare array** (no pagination wrapper) are called out pe
   "memberships": [
     {
       "tenantId": "660e8400-e29b-41d4-a716-446655440001",
+      "tenantName": "My Restaurant",
       "tenantSlug": "my-restaurant",
       "roles": ["owner"],
       "branchAccess": { "scope": "all" },

@@ -61,6 +61,7 @@ class BranchOutputSerializer(serializers.Serializer):
 
 class MembershipOutputSerializer(serializers.Serializer):
     tenantId = serializers.UUIDField(source="tenant.id")
+    tenantName = serializers.CharField(source="tenant.name")
     tenantSlug = serializers.CharField(source="tenant.slug")
     tenantIsActive = serializers.BooleanField(source="tenant.is_active")
     tenantStatus = serializers.CharField(source="tenant.status")
