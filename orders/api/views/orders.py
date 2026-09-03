@@ -15,6 +15,7 @@ from orders.api.serializers.request import (
 from orders.api.serializers.response import (
     OrderListItemResponseSerializer,
     OrderResponseSerializer,
+    PendingCountResponseSerializer,
     ValidateDiscountResponseSerializer,
 )
 
@@ -244,6 +245,32 @@ class ConsoleOrderListView(generics.ListAPIView):
             tenant_id=self.kwargs["tenant_id"],
             branch_id=self.kwargs["branch_id"],
         )
+
+
+@extend_schema(
+    tags=["Orders - Console"],
+    summary="Console pending order count",
+    description=(
+        "Authoritative pending-order count for a tenant branch. "
+        "Restricted to the tenant owner or staff with orders.view "
+        "at that branch. Pending means status='pending' only."
+    ),
+    responses={200: PendingCountResponseSerializer},
+)
+class ConsolePendingOrderCountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    bll_class = OrdersBusinessLogicLayer
+
+    def get_bll(self):
+        return self.bll_class()
+
+    def get(self, request, tenant_id, branch_id, *args, **kwargs):
+        count = self.get_bll().get_pending_order_count(
+            user=request.user,
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+        )
+        return Response(PendingCountResponseSerializer({"count": count}).data)
 
 
 @extend_schema(

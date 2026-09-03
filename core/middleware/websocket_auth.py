@@ -22,7 +22,11 @@ def get_user_from_token(token: str):
 
 class JWTAuthMiddleware(BaseMiddleware):
     """
-    Usage: ws://host/ws/orders/<public_id>/?token=<access_token>
+    JWT query-string authentication for Django Channels.
+
+    Usage:
+        ws://host/ws/orders/<public_id>/?token=<access_token>
+        ws://host/ws/console/<branch_id>/?token=<access_token>
     """
 
     async def __call__(self, scope, receive, send):

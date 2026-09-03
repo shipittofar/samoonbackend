@@ -5,13 +5,15 @@ from addresses.api.views.legacy import (
     LegacyAddressDetailView,
     LegacyAddressListCreateView,
 )
-from orders.api.views import (    OrderCancelView,
+from orders.api.views import (
+    ConsoleOrderListView,
+    ConsolePendingOrderCountView,
+    ConsoleTenantOrdersListView,
+    OrderCancelView,
     OrderDetailView,
     OrderListCreateView,
     OrderStatusUpdateView,
     ValidateDiscountView,
-    ConsoleOrderListView,
-    ConsoleTenantOrdersListView,
 )
 
 app_name = "orders"
@@ -57,6 +59,11 @@ urlpatterns = [
         "console-orders/tenants/<uuid:tenant_id>/branches/",
         ConsoleTenantOrdersListView.as_view(),
         name="console-order-tenant-list",
+    ),
+    path(
+        "console-orders/tenants/<uuid:tenant_id>/branches/<uuid:branch_id>/pending-count/",
+        ConsolePendingOrderCountView.as_view(),
+        name="console-order-pending-count",
     ),
     path(
         "console-orders/tenants/<uuid:tenant_id>/branches/<uuid:branch_id>/",

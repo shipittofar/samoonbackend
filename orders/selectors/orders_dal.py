@@ -99,6 +99,20 @@ class OrdersDataAccessLayer:
             branch_id=branch_id,
         )
 
+    def count_pending_orders_for_branch(
+        self,
+        *,
+        tenant_id: UUID,
+        branch_id: UUID,
+    ) -> int:
+        from orders.constants import PENDING_ORDER_STATUSES
+
+        return Order.objects.filter(
+            branch_id=branch_id,
+            branch__tenant_id=tenant_id,
+            status__in=PENDING_ORDER_STATUSES,
+        ).count()
+
     def list_orders_for_console_tenant(
         self,
         *,

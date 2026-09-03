@@ -70,6 +70,7 @@ urlpatterns = [
     path('api/menu/', include('menu.api.urls', namespace='menu')),
 
     path('api/orders/', include('orders.api.urls', namespace='orders')),
+    path('api/reservations/', include('reservations.api.urls', namespace='reservations')),
 
     path('api/auth/', include('accounts.api.urls', namespace='accounts')),
     path('api/users/', include('accounts.api.urls_users', namespace='users')),

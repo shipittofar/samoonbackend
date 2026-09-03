@@ -1,3 +1,10 @@
+from .console_workspace import (
+    CONSOLE_WORKSPACE_PERMISSIONS,
+    ORDERS_CONSOLE_PERMISSIONS,
+    RESERVATIONS_CONSOLE_PERMISSIONS,
+    authorize_console_branch,
+    user_has_console_permissions,
+)
 from .tenant_access import (
     BaseTenantPermission,
     RequirePermission,
@@ -19,6 +26,11 @@ from .admin_role_protection import (
 )
 
 __all__ = [
+    "CONSOLE_WORKSPACE_PERMISSIONS",
+    "ORDERS_CONSOLE_PERMISSIONS",
+    "RESERVATIONS_CONSOLE_PERMISSIONS",
+    "authorize_console_branch",
+    "user_has_console_permissions",
     "BaseTenantPermission",
     "RequirePermission",
     "TenantOwnerChecker",

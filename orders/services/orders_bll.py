@@ -33,7 +33,10 @@ from core.exceptions import (
     TableNumberRequiredException,
     TenantNotFoundException,
 )
-from orders.ws.notifications import notify_order_status_change
+from orders.ws.notifications import (
+    notify_order_status_change,
+    schedule_console_order_changed,
+)
 
 
 CANCELLABLE_STATUSES = {OrderStatus.PENDING, OrderStatus.CONFIRMED}
@@ -121,6 +124,7 @@ class OrdersBusinessLogicLayer:
                                subtotal, discount_amount)
 
             self.dal.create_status_history(order, OrderStatus.PENDING)
+            schedule_console_order_changed(order)
 
         return self.dal.get_order_by_id(order.id)
 
@@ -214,6 +218,8 @@ class OrdersBusinessLogicLayer:
             self.dal.create_status_history(
                 order, OrderStatus.CANCELLED, note="Cancelled by customer"
             )
+            schedule_console_order_changed(order)
+            transaction.on_commit(lambda: notify_order_status_change(order))
 
         return self.dal.get_order_by_id(order.id)
 
@@ -269,7 +275,7 @@ class OrdersBusinessLogicLayer:
 
             self.dal.update_order_fields(order, status=new_status)
             self.dal.create_status_history(order, new_status)
-
+            schedule_console_order_changed(order)
             transaction.on_commit(lambda: notify_order_status_change(order))
 
         return self.dal.get_order_by_id(order.id)
@@ -291,6 +297,29 @@ class OrdersBusinessLogicLayer:
         self._assert_console_tenant_owner(user=user, tenant=branch.tenant)
 
         return self.dal.list_orders_for_console(
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+        )
+
+    def get_pending_order_count(
+        self,
+        *,
+        user,
+        tenant_id: UUID,
+        branch_id: UUID,
+    ) -> int:
+        from access.authorization.console_workspace import (
+            ORDERS_CONSOLE_PERMISSIONS,
+            authorize_console_branch,
+        )
+
+        authorize_console_branch(
+            user=user,
+            tenant_id=tenant_id,
+            branch_id=branch_id,
+            permission_slugs=ORDERS_CONSOLE_PERMISSIONS,
+        )
+        return self.dal.count_pending_orders_for_branch(
             tenant_id=tenant_id,
             branch_id=branch_id,
         )

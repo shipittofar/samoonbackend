@@ -191,3 +191,7 @@ class ValidateDiscountResponseSerializer(serializers.Serializer):
     valid = serializers.BooleanField()
     discount_code = serializers.CharField()
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class PendingCountResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()

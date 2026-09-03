@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'addresses.apps.AddressesConfig',
     'orders.apps.OrdersConfig',
+    'reservations.apps.ReservationsConfig',
     'access.apps.AccessConfig',
     'seeders.apps.SeedersConfig',
     'website_builder.apps.WebsiteBuilderConfig',
