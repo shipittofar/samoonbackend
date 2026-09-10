@@ -46,7 +46,14 @@ class OTPBusinessLogiclayer:
         )
 
     @classmethod
-    def verify(cls, identifier: str, code: str, otp_type: str) -> None:
+    def verify(
+        cls,
+        identifier: str,
+        code: str,
+        otp_type: str,
+        *,
+        commit_success: bool = True,
+    ) -> OTPCode:
         otp = user_dal.get_latest_active_otp(identifier, otp_type=otp_type)
 
         if otp is None:
@@ -75,7 +82,9 @@ class OTPBusinessLogiclayer:
             raise OTPInvalidException()
 
         otp.is_used = True
-        otp.save(update_fields=["is_used"])
+        if commit_success:
+            otp.save(update_fields=["is_used"])
+        return otp
 
     @classmethod
     def _generate_code(cls) -> str:

@@ -1,2 +1,3 @@
 from .user_dal import UserDataAccessLayer
 from .favorite_dal import FavoriteDataAccessLayer
+from .console_customers_dal import ConsoleCustomersDataAccessLayer

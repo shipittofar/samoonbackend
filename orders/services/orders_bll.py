@@ -346,6 +346,43 @@ class OrdersBusinessLogicLayer:
             search=search,
         )
 
+    def list_customers_for_console_tenant(
+        self,
+        *,
+        user,
+        tenant_id: UUID,
+        branch_id: Optional[str] = None,
+        search: Optional[str] = None,
+    ):
+        from accounts.selectors.console_customers_dal import (
+            ConsoleCustomersDataAccessLayer,
+        )
+
+        tenant = self.dal.get_tenant_for_console(tenant_id=tenant_id)
+        if tenant is None:
+            raise TenantNotFoundException()
+
+        self._assert_console_tenant_owner(user=user, tenant=tenant)
+
+        resolved_branch_id = None
+        if branch_id:
+            try:
+                branch = self.dal.get_branch_for_console(
+                    tenant_id=tenant_id,
+                    branch_id=branch_id,
+                )
+            except (TypeError, ValueError):
+                raise BranchNotFoundException()
+            if branch is None:
+                raise BranchNotFoundException()
+            resolved_branch_id = branch.id
+
+        return ConsoleCustomersDataAccessLayer.list_customers_for_console_tenant(
+            tenant_id=tenant_id,
+            branch_id=resolved_branch_id,
+            search=search,
+        )
+
     @staticmethod
     def _assert_console_tenant_owner(*, user, tenant) -> None:
         if tenant.owner.user_id != user.id:

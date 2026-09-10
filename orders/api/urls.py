@@ -8,6 +8,7 @@ from addresses.api.views.legacy import (
 from orders.api.views import (
     ConsoleOrderListView,
     ConsolePendingOrderCountView,
+    ConsoleTenantCustomersListView,
     ConsoleTenantOrdersListView,
     OrderCancelView,
     OrderDetailView,
@@ -55,6 +56,11 @@ urlpatterns = [
         name="order-status-update",
     ),
     # Console APIs
+    path(
+        "console-orders/tenants/<uuid:tenant_id>/customers/",
+        ConsoleTenantCustomersListView.as_view(),
+        name="console-customer-tenant-list",
+    ),
     path(
         "console-orders/tenants/<uuid:tenant_id>/branches/",
         ConsoleTenantOrdersListView.as_view(),

@@ -9,7 +9,7 @@ from rest_framework.generics import (
     UpdateAPIView,
     DestroyAPIView,
 )
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiExample, extend_schema
 
 from accounts.models import OTPType
 from accounts.selectors import UserDataAccessLayer
@@ -335,7 +335,45 @@ class RequestEmailVerificationView(CreateAPIView):
 @extend_schema(
     tags=["Auth - verification"],
     summary="Confirm Email Verification",
-    description="Verify the code and permanently set the email on the account (only if not already set).",
+    description=(
+        "Confirm a 6-digit email OTP and permanently attach that email to the "
+        "authenticated user (only if the account does not already have an email).\n\n"
+        "**HTTP 200 means:** the OTP was valid, the email was saved on the user, "
+        "and the response body is that updated user (`UserOutputSerializer`). "
+        "The `email` field is the confirmed address.\n\n"
+        "**`is_verified` is not the email-OTP result.** It is account-level "
+        "profile completeness (`first_name`, `last_name`, `phone_number`, `email`) "
+        "and is set only by `POST /api/auth/verify-account/`. After a successful "
+        "email confirm, `is_verified` may still be `false`.\n\n"
+        "This endpoint does not issue tokens, return a success message envelope, "
+        "or mark the account verified."
+    ),
+    request=EmailVerificationConfirmInputSerializer,
+    responses={200: UserOutputSerializer},
+    examples=[
+        OpenApiExample(
+            "Confirm email OTP",
+            value={"email": "user@example.com", "code": "123456"},
+            request_only=True,
+        ),
+        OpenApiExample(
+            "Email attached; account not necessarily verified",
+            value={
+                "id": "00000000-0000-0000-0000-000000000001",
+                "email": "user@example.com",
+                "phone_number": None,
+                "first_name": "John",
+                "last_name": "Doe",
+                "avatar": None,
+                "role": "customer",
+                "is_verified": False,
+                "is_superuser": False,
+                "created_at": "2026-01-01T12:00:00Z",
+            },
+            response_only=True,
+            status_codes=["200"],
+        ),
+    ],
 )
 class ConfirmEmailVerificationView(CreateAPIView):
     serializer_class = EmailVerificationConfirmInputSerializer
@@ -354,7 +392,15 @@ class ConfirmEmailVerificationView(CreateAPIView):
 @extend_schema(
     tags=["Auth - verification"],
     summary="Verify Account Completion",
-    description="Check whether all required account fields (name, phone number, email) are complete. Marks the account as verified if complete, otherwise returns the missing fields.",
+    description=(
+        "Account-level verification: if `first_name`, `last_name`, `phone_number`, "
+        "and `email` are all set, sets `is_verified` to true. Otherwise returns "
+        "`is_verified: false` and `missing_fields`.\n\n"
+        "This is not email OTP confirmation. Attaching an email via "
+        "`POST /api/auth/verify-email/confirm/` does not set `is_verified`. "
+        "Always HTTP 200; incomplete profiles are not an error."
+    ),
+    responses={200: AccountVerifyOutputSerializer},
 )
 class VerifyAccountView(CreateAPIView):
     serializer_class = serializers.Serializer

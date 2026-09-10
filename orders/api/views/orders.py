@@ -13,6 +13,7 @@ from orders.api.serializers.request import (
     ValidateDiscountRequestSerializer,
 )
 from orders.api.serializers.response import (
+    ConsoleCustomerResponseSerializer,
     OrderListItemResponseSerializer,
     OrderResponseSerializer,
     PendingCountResponseSerializer,
@@ -220,6 +221,66 @@ class ConsoleTenantOrdersListView(generics.ListAPIView):
             tenant_id=self.kwargs["tenant_id"],
             branch_id=branch_id or None,
             status=self.request.query_params.get("status") or None,
+            search=self.request.query_params.get("search") or None,
+        )
+
+
+@extend_schema(
+    tags=["Orders - Console"],
+    summary="Console customers list",
+    description=(
+        "List distinct customer users associated with a tenant through orders "
+        "or reservations. Optional `branch_id` narrows the list to one branch "
+        "of that tenant. Guest (null-customer) activity is excluded. "
+        "Only the tenant owner can access. "
+        "Sorted by last activity (order or reservation created_at) descending."
+    ),
+    parameters=[
+        OpenApiParameter(
+            name="branch_id",
+            type=str,
+            description=(
+                "Optional branch UUID. Must belong to the tenant in the path. "
+                "When omitted, customers from all tenant branches are returned."
+            ),
+        ),
+        OpenApiParameter(
+            name="search",
+            type=str,
+            description=(
+                "Optional search matched against email, phone_number, "
+                "first_name, last_name, or concatenated full name."
+            ),
+        ),
+        OpenApiParameter(
+            name="page",
+            type=int,
+            description="Page number for pagination.",
+        ),
+        OpenApiParameter(
+            name="page_size",
+            type=int,
+            description="Number of results per page.",
+        ),
+    ],
+    responses={200: ConsoleCustomerResponseSerializer(many=True)},
+)
+class ConsoleTenantCustomersListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ConsoleCustomerResponseSerializer
+    pagination_class = OrderConsolePagination
+
+    bll_class = OrdersBusinessLogicLayer
+
+    def get_bll(self):
+        return self.bll_class()
+
+    def get_queryset(self):
+        branch_id = self.request.query_params.get("branch_id")
+        return self.get_bll().list_customers_for_console_tenant(
+            user=self.request.user,
+            tenant_id=self.kwargs["tenant_id"],
+            branch_id=branch_id or None,
             search=self.request.query_params.get("search") or None,
         )
 

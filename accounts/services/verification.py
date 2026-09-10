@@ -1,3 +1,5 @@
+from django.db import transaction
+
 from accounts.models import User, OTPType
 from accounts.selectors import UserDataAccessLayer
 from core.exceptions.account import (
@@ -64,10 +66,19 @@ class EmailVerificationBusinessLogicLayer:
         if user_dal.exists_by_email(email, exclude_user_id=user.id):
             raise EmailAlreadyExistsException()
 
-        otp_bll.verify(identifier=email, code=code, otp_type=OTPType.VERIFY_EMAIL)
-
-        user.email = email
-        user.save(update_fields=["email"])
+        # Failure-path OTP writes (attempts / lockout) commit before this block.
+        # Success: consume OTP and persist email together so a failed user save
+        # cannot leave the OTP used with no email attached.
+        otp = otp_bll.verify(
+            identifier=email,
+            code=code,
+            otp_type=OTPType.VERIFY_EMAIL,
+            commit_success=False,
+        )
+        with transaction.atomic():
+            otp.save(update_fields=["is_used"])
+            user.email = email
+            user.save(update_fields=["email"])
         return user
 
 
