@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from tenants.api.serializers.fields import BusinessTypesField
+from tenants.api.serializers.response.qr import serialize_qr
 from tenants.api.serializers.response.tenant_summary import (
     TenantSummarySerializer,
     build_tenant_summary,
@@ -166,6 +167,10 @@ class BranchResponseSerializer(BranchCheckoutResponseMixin, serializers.Serializ
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
     metadata = serializers.JSONField(read_only=True)
+    qr = serializers.SerializerMethodField()
+
+    def get_qr(self, obj):
+        return serialize_qr(obj, self.context.get("request"))
 
     def get_tenantId(self, obj):
         return getattr(obj, "tenant_id", None)
@@ -226,6 +231,7 @@ class TenantResponseSerializer(serializers.Serializer):
     settings = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
+    qr = serializers.SerializerMethodField()
 
     def get_settings(self, obj):
         raw = getattr(obj, "settings", None) or {}
@@ -234,6 +240,9 @@ class TenantResponseSerializer(serializers.Serializer):
         if self.context.get("public_settings"):
             return project_public_tenant_settings(raw)
         return project_owner_tenant_settings(raw)
+
+    def get_qr(self, obj):
+        return serialize_qr(obj, self.context.get("request"))
 
     def get_owner_id(self, obj):
         owner_user_id = getattr(obj, "owner_user_id", None)
@@ -273,9 +282,13 @@ class PublicTenantResponseSerializer(serializers.Serializer):
     settings = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
+    qr = serializers.SerializerMethodField()
 
     def get_settings(self, obj):
         return project_public_tenant_settings(getattr(obj, "settings", None) or {})
+
+    def get_qr(self, obj):
+        return serialize_qr(obj, self.context.get("request"))
 
     def get_image(self, obj):
         return _media_url(obj, "image", "image_url")

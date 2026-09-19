@@ -96,6 +96,9 @@ class Tenant(WebPImageMixin, models.Model):
         self.settings = strip_phase1_deprecated_tenant_settings(self.settings)
         assign_unique_slug(self, Tenant)
         super().save(*args, **kwargs)
+        from tenants.services.qr_bll import QrCodeBusinessLogicLayer
+
+        QrCodeBusinessLogicLayer.attach_after_save(self)
 
     def get_feature_flag(self, flag: str, default=False):
         """JSON accessor for ``settings.featureFlags``.
@@ -250,6 +253,9 @@ class Branch(WebPImageMixin, models.Model):
     def save(self, *args, **kwargs):
         assign_unique_slug(self, Branch)
         super().save(*args, **kwargs)
+        from tenants.services.qr_bll import QrCodeBusinessLogicLayer
+
+        QrCodeBusinessLogicLayer.attach_after_save(self)
 
     def __str__(self) -> str:
         return f"{self.tenant.name} - {self.name}" if self.name else self.tenant.name

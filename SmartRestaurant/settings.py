@@ -206,6 +206,9 @@ REST_FRAMEWORK = {
     },
 }
 MAX_USER_ADDRESSES = int(os.getenv("MAX_USER_ADDRESSES", "20"))
+# Frontend origin used when QR resolution redirects to storefront paths.
+PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "http://localhost:3000").rstrip("/")
+PUBLIC_API_URL = os.getenv("PUBLIC_API_URL", "").rstrip("/")
 ADDRESSES_SUPPORT_STAFF_READ_ONLY = os.getenv(
     "ADDRESSES_SUPPORT_STAFF_READ_ONLY", "true"
 ).lower() in ("1", "true", "yes")
@@ -234,6 +237,8 @@ SPECTACULAR_SETTINGS = {
             "description": "creating, updating, and managing branches"},
         {"name": "Tenant - Website Builder",
             "description": "managing tenant public website layout and branch overrides"},
+        {"name": "Public - QR",
+            "description": "public QR code resolution and redirect"},
 
         {"name": "Access - Role",
             "description": "creating, updating, and managing system roles"},

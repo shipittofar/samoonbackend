@@ -46,7 +46,7 @@ class TenantCreateAPIView(CreateAPIView):
             user=request.user, **serializer.validated_data)
 
         return Response(
-            TenantResponseSerializer(tenant).data,
+            TenantResponseSerializer(tenant, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -71,7 +71,7 @@ class TenantUpdateAPIView(UpdateAPIView):
             **serializer.validated_data,
         )
 
-        return Response(TenantResponseSerializer(tenant).data)
+        return Response(TenantResponseSerializer(tenant, context={"request": request}).data)
 
 
 @extend_schema(tags=["Tenant - Tenant"], summary="patch Tenant settings")
@@ -84,7 +84,7 @@ class TenantSettingsPatchAPIView(APIView):
             tenant_id=tenant_id,
             patch=dict(request.data),
         )
-        return Response(TenantResponseSerializer(tenant).data)
+        return Response(TenantResponseSerializer(tenant, context={"request": request}).data)
 
 
 @extend_schema(tags=["Tenant - Tenant"], summary="retrieve Tenant (public catalog)")
@@ -94,7 +94,10 @@ class TenantRetrieveAPIView(RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         tenant = tenant_bll.get_public_tenant(tenant_id=kwargs["tenant_id"])
         return Response(
-            TenantResponseSerializer(tenant, context={"public_settings": True}).data
+            TenantResponseSerializer(
+                tenant,
+                context={"public_settings": True, "request": request},
+            ).data
         )
 
 
@@ -160,7 +163,7 @@ class BranchCreateAPIView(CreateAPIView):
         )
 
         return Response(
-            BranchResponseSerializer(branch).data,
+            BranchResponseSerializer(branch, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -186,7 +189,7 @@ class BranchUpdateAPIView(UpdateAPIView):
             **serializer.validated_data,
         )
 
-        return Response(BranchResponseSerializer(branch).data)
+        return Response(BranchResponseSerializer(branch, context={"request": request}).data)
 
 
 @extend_schema(tags=["Tenant - Branch"], summary="retrieve Branch")
@@ -203,7 +206,7 @@ class BranchRetrieveAPIView(RetrieveAPIView):
             tenant_id=kwargs["tenant_id"],
             branch_id=kwargs["branch_id"],
         )
-        return Response(BranchResponseSerializer(branch).data)
+        return Response(BranchResponseSerializer(branch, context={"request": request}).data)
 
 
 @extend_schema(tags=["Tenant - Branch"], summary="list Branches for a Tenant")
@@ -272,7 +275,7 @@ class BranchConsoleUpdateAPIView(APIView):
         )
 
         return Response(
-            BranchResponseSerializer(branch).data,
+            BranchResponseSerializer(branch, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
 
@@ -296,4 +299,4 @@ class BranchGlobalRetrieveAPIView(RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         branch = branch_bll.get_branch_public(branch_id=kwargs["branch_id"])
-        return Response(BranchResponseSerializer(branch).data)
+        return Response(BranchResponseSerializer(branch, context={"request": request}).data)

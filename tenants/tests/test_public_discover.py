@@ -168,6 +168,7 @@ class PublicDiscoverListTests(TestCase):
                 "theme",
                 "marketplace",
                 "branches",
+                "qr",
             },
         )
         self.assertEqual(item["status"], "active")
@@ -205,6 +206,7 @@ class PublicDiscoverListTests(TestCase):
                 "openNow",
                 "todayHours",
                 "location",
+                "qr",
             },
         )
         self.assertEqual(branch["cuisines"], ["Italian"])

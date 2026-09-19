@@ -5,6 +5,8 @@ from django.db.models import Prefetch
 from core.cache import cache_get, cache_set, cache_delete, CacheKeys, CacheTTL
 from tenants.dto import BranchDTO, TenantDiscoverDTO, TenantDTO
 from tenants.models import Tenant, TenantStatus, Owner, Branch, BranchStatus
+from tenants.models.qr_code import QrEntityType
+from tenants.selectors.qr_dal import annotate_qr_code
 from tenants.selectors.tenant_availability import (
     PUBLIC_TENANT_FILTER,
     PUBLIC_TENANT_LOOKUP,
@@ -76,7 +78,10 @@ class TenantDataAccessLayer:
 
     @staticmethod
     def _tenant_detail_queryset():
-        return Tenant.objects.select_related("owner", "owner__user")
+        return annotate_qr_code(
+            Tenant.objects.select_related("owner", "owner__user"),
+            QrEntityType.TENANT,
+        )
 
     @staticmethod
     def _refresh_tenant_detail_cache(tenant_id) -> TenantDTO | None:
@@ -171,8 +176,10 @@ class TenantDataAccessLayer:
             .prefetch_related("working_hours")
         )
         rows = list(
-            Tenant.objects
-            .filter(**PUBLIC_TENANT_FILTER)
+            annotate_qr_code(
+                Tenant.objects.filter(**PUBLIC_TENANT_FILTER),
+                QrEntityType.TENANT,
+            )
             .prefetch_related(Prefetch("branches", queryset=public_branches_qs))
             .order_by("-created_at")
         )
@@ -238,22 +245,20 @@ class TenantDataAccessLayer:
 
     @staticmethod
     def get_public_tenants():
-        return (
-            Tenant.objects
-            .filter(**PUBLIC_TENANT_FILTER)
-            .order_by("-created_at")
-        )
+        return annotate_qr_code(
+            Tenant.objects.filter(**PUBLIC_TENANT_FILTER),
+            QrEntityType.TENANT,
+        ).order_by("-created_at")
 
     @staticmethod
     def get_console_tenants(user):
-        return (
+        return annotate_qr_code(
             Tenant.objects.filter(
                 status=TenantStatus.ACTIVE,
                 owner__user=user,
-            )
-            .select_related("owner", "owner__user")
-            .order_by("-created_at")
-        )
+            ).select_related("owner", "owner__user"),
+            QrEntityType.TENANT,
+        ).order_by("-created_at")
 
     # ---------- writes ----------
 
@@ -291,18 +296,22 @@ class BranchDataAccessLayer:
         Mirrors the active-branch rules used by the global branch list and
         additionally excludes branches explicitly hidden from the marketplace.
         """
-        return (
-            Branch.objects
-            .filter(status=BranchStatus.ACTIVE, is_active=True, marketplace_visible=True)
-            .order_by("name")
+        return annotate_qr_code(
+            Branch.objects.filter(
+                status=BranchStatus.ACTIVE,
+                is_active=True,
+                marketplace_visible=True,
+            ).order_by("name"),
+            QrEntityType.BRANCH,
         )
 
     @staticmethod
     def _branch_detail_queryset():
-        return (
+        return annotate_qr_code(
             Branch.objects
             .select_related("tenant", "tenant__owner", "tenant__owner__user")
-            .prefetch_related("working_hours")
+            .prefetch_related("working_hours"),
+            QrEntityType.BRANCH,
         )
 
     # ---------- cache helpers ----------

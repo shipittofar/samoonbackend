@@ -98,6 +98,7 @@ class TenantDetailLookupTests(TestCase):
                 "settings",
                 "created_at",
                 "updated_at",
+                "qr",
             },
         )
 

@@ -93,6 +93,7 @@ class PublicTenantListTests(TestCase):
                 "settings",
                 "created_at",
                 "updated_at",
+                "qr",
             },
         )
 

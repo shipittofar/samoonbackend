@@ -1,6 +1,7 @@
 from .base import BaseAppException
 from .address import *
 from .tenant import *
+from .qr import *
 from .category import *
 from .item import *
 from .account import *

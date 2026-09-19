@@ -21,6 +21,11 @@ def _image_name(file_field) -> str | None:
     return name or None
 
 
+def _qr_code_value(obj) -> str | None:
+    value = getattr(obj, "qr_code", None)
+    return value or None
+
+
 def _image_url(file_field) -> str | None:
     if not file_field:
         return None
@@ -84,6 +89,7 @@ class TenantDTO:
     settings: dict
     created_at: datetime
     updated_at: datetime
+    qr_code: str | None = None
 
     @classmethod
     def from_model(cls, tenant) -> TenantDTO:
@@ -111,6 +117,7 @@ class TenantDTO:
             settings=dict(tenant.settings or {}),
             created_at=tenant.created_at,
             updated_at=tenant.updated_at,
+            qr_code=_qr_code_value(tenant),
         )
 
     def to_cache_dict(self) -> dict[str, Any]:
@@ -127,6 +134,7 @@ class TenantDTO:
         payload.setdefault("discover_cover_url", None)
         payload.setdefault("hero_image", None)
         payload.setdefault("hero_image_url", None)
+        payload.setdefault("qr_code", None)
         return cls(**payload)
 
 
@@ -199,6 +207,7 @@ class BranchDTO:
     created_at: datetime
     updated_at: datetime
     working_hours: list[WorkingHourDTO] = field(default_factory=list)
+    qr_code: str | None = None
 
     @classmethod
     def from_model(cls, branch) -> BranchDTO:
@@ -272,6 +281,7 @@ class BranchDTO:
             created_at=branch.created_at,
             updated_at=branch.updated_at,
             working_hours=hours,
+            qr_code=_qr_code_value(branch),
         )
 
     def to_cache_dict(self) -> dict[str, Any]:
@@ -294,6 +304,7 @@ class BranchDTO:
         payload.setdefault("amenities", [])
         payload.setdefault("hero_image", None)
         payload.setdefault("hero_image_url", None)
+        payload.setdefault("qr_code", None)
         return cls(**payload)
 
 
@@ -330,6 +341,7 @@ class BranchDiscoverDTO:
     cuisines: list = field(default_factory=list)
     amenities: list = field(default_factory=list)
     working_hours: list[WorkingHourDTO] = field(default_factory=list)
+    qr_code: str | None = None
 
     @classmethod
     def from_model(cls, branch) -> BranchDiscoverDTO:
@@ -359,6 +371,7 @@ class BranchDiscoverDTO:
             working_hours=[
                 WorkingHourDTO.from_model(wh) for wh in branch.working_hours.all()
             ],
+            qr_code=_qr_code_value(branch),
         )
 
     def to_cache_dict(self) -> dict[str, Any]:
@@ -382,6 +395,7 @@ class BranchDiscoverDTO:
         payload.setdefault("cover_image_url", None)
         payload.setdefault("hero_image", None)
         payload.setdefault("hero_image_url", None)
+        payload.setdefault("qr_code", None)
         return cls(**payload)
 
 
@@ -413,6 +427,7 @@ class TenantDiscoverDTO:
     discover_cover_url: str | None = None
     hero_image: str | None = None
     hero_image_url: str | None = None
+    qr_code: str | None = None
     branches: list[BranchDiscoverDTO] = field(default_factory=list)
 
     @classmethod
@@ -435,6 +450,7 @@ class TenantDiscoverDTO:
             discover_cover_url=_image_url(tenant.discover_cover),
             hero_image=_image_name(tenant.hero_image),
             hero_image_url=_image_url(tenant.hero_image),
+            qr_code=_qr_code_value(tenant),
             branches=[
                 BranchDiscoverDTO.from_model(branch)
                 for branch in tenant.branches.all()
@@ -464,4 +480,5 @@ class TenantDiscoverDTO:
         payload.setdefault("is_active", False)
         payload.setdefault("status", "inactive")
         payload.setdefault("description", "")
+        payload.setdefault("qr_code", None)
         return cls(**payload)

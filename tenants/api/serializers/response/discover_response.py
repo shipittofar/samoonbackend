@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from tenants.api.serializers.response.branding import TenantBrandingSerializer
+from tenants.api.serializers.response.qr import serialize_qr
 from tenants.api.serializers.response.tenant_response import _media_url
 from tenants.branding import (
     build_legacy_discover_theme,
@@ -32,6 +33,7 @@ class DiscoverBranchResponseSerializer(serializers.Serializer):
     openNow = serializers.SerializerMethodField()
     todayHours = serializers.SerializerMethodField()
     location = DiscoverBranchLocationResponseSerializer(source="*", read_only=True)
+    qr = serializers.SerializerMethodField()
 
     def get_image(self, obj) -> str | None:
         return _media_url(obj, "image", "image_url")
@@ -58,6 +60,9 @@ class DiscoverBranchResponseSerializer(serializers.Serializer):
     def get_todayHours(self, obj) -> str | None:
         return self._get_availability(obj)["todayHours"]
 
+    def get_qr(self, obj):
+        return serialize_qr(obj, self.context.get("request"))
+
 
 class DiscoverTenantResponseSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
@@ -77,6 +82,7 @@ class DiscoverTenantResponseSerializer(serializers.Serializer):
     theme = serializers.SerializerMethodField()
     marketplace = serializers.SerializerMethodField()
     branches = DiscoverBranchResponseSerializer(many=True, read_only=True)
+    qr = serializers.SerializerMethodField()
 
     def get_businessTypes(self, obj) -> list[str]:
         return list(getattr(obj, "business_types", None) or [])
@@ -113,3 +119,6 @@ class DiscoverTenantResponseSerializer(serializers.Serializer):
     def get_marketplace(self, obj) -> dict:
         public_branches = get_public_branches(obj)
         return build_marketplace_metadata(obj, public_branches)
+
+    def get_qr(self, obj):
+        return serialize_qr(obj, self.context.get("request"))

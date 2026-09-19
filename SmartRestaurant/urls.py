@@ -64,6 +64,7 @@ urlpatterns = [
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema')),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema')),
 
+    path('qr/<slug:code>/', include(('tenants.api.urls_qr', 'qr'), namespace='qr')),
     path('api/public/', include('tenants.api.urls_public', namespace='public')),
     path('api/tenants/', include('tenants.api.urls', namespace='tenants')),
     path('api/branches/', include('tenants.api.urls_branches', namespace='branches')),
