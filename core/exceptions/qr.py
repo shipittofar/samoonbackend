@@ -23,3 +23,9 @@ class UnauthorizedQrAccessException(BaseAppException):
     status_code = 403
     code = "unauthorized_qr_access"
     message = "You do not have permission to manage this QR code."
+
+
+class QrInvalidDestinationException(BaseAppException):
+    status_code = 400
+    code = "qr_invalid_destination"
+    message = "Invalid QR destination type."

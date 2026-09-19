@@ -239,6 +239,8 @@ SPECTACULAR_SETTINGS = {
             "description": "managing tenant public website layout and branch overrides"},
         {"name": "Public - QR",
             "description": "public QR code resolution and redirect"},
+        {"name": "Tenant - QR",
+            "description": "authenticated tenant and branch QR management"},
 
         {"name": "Access - Role",
             "description": "creating, updating, and managing system roles"},

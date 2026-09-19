@@ -7,6 +7,7 @@ from django.db import IntegrityError, transaction
 from core.exceptions.qr import (
     QrAlreadyExistsException,
     QrDisabledException,
+    QrInvalidDestinationException,
     QrNotFoundException,
     UnauthorizedQrAccessException,
 )
@@ -186,6 +187,7 @@ class QrCodeBusinessLogicLayer:
         QrCodeBusinessLogicLayer._assert_can_manage(user, qr)
         qr.is_active = False
         qr.save(update_fields=["is_active", "updated_at"])
+        QrCodeBusinessLogicLayer._schedule_cache_invalidation(qr)
         return qr
 
     @staticmethod
@@ -197,18 +199,20 @@ class QrCodeBusinessLogicLayer:
             raise QrAlreadyExistsException()
         qr.is_active = True
         qr.save(update_fields=["is_active", "updated_at"])
+        QrCodeBusinessLogicLayer._schedule_cache_invalidation(qr)
         return qr
 
     @staticmethod
     def set_destination(user, qr: QrCode, destination_type: str) -> QrCode:
         QrCodeBusinessLogicLayer._assert_can_manage(user, qr)
         if destination_type not in QrDestinationType.values:
-            raise QrNotFoundException()
+            raise QrInvalidDestinationException()
         if qr.entity_type == QrEntityType.TENANT and destination_type != QrDestinationType.TENANT:
             # Tenant QRs only resolve to the tenant public URL in v1.
             destination_type = QrDestinationType.TENANT
         qr.destination_type = destination_type
         qr.save(update_fields=["destination_type", "updated_at"])
+        QrCodeBusinessLogicLayer._schedule_cache_invalidation(qr)
         return qr
 
     @staticmethod
@@ -217,11 +221,146 @@ class QrCodeBusinessLogicLayer:
         with transaction.atomic():
             qr.is_active = False
             qr.save(update_fields=["is_active", "updated_at"])
-            return QrCodeBusinessLogicLayer._create(
+            new_qr = QrCodeBusinessLogicLayer._create(
                 entity_type=qr.entity_type,
                 entity_id=qr.entity_id,
                 destination_type=qr.destination_type,
             )
+            QrCodeBusinessLogicLayer._schedule_cache_invalidation(new_qr)
+            return new_qr
+
+    @staticmethod
+    def get_tenant_qr(user, tenant_id) -> QrCode:
+        tenant = QrCodeBusinessLogicLayer._load_owned_tenant(user, tenant_id)
+        qr = qr_dal.get_active_for_entity(QrEntityType.TENANT, tenant.id)
+        if qr is None:
+            raise QrNotFoundException()
+        return qr
+
+    @staticmethod
+    def get_branch_qr(user, branch_id) -> QrCode:
+        branch = QrCodeBusinessLogicLayer._load_owned_branch(user, branch_id)
+        qr = qr_dal.get_active_for_entity(QrEntityType.BRANCH, branch.id)
+        if qr is None:
+            raise QrNotFoundException()
+        return qr
+
+    @staticmethod
+    def enable_tenant_qr(user, tenant_id) -> QrCode:
+        tenant = QrCodeBusinessLogicLayer._load_owned_tenant(user, tenant_id)
+        qr = QrCodeBusinessLogicLayer._qr_for_enable(
+            QrEntityType.TENANT, tenant.id
+        )
+        return QrCodeBusinessLogicLayer.enable(user, qr)
+
+    @staticmethod
+    def enable_branch_qr(user, branch_id) -> QrCode:
+        branch = QrCodeBusinessLogicLayer._load_owned_branch(user, branch_id)
+        qr = QrCodeBusinessLogicLayer._qr_for_enable(
+            QrEntityType.BRANCH, branch.id
+        )
+        return QrCodeBusinessLogicLayer.enable(user, qr)
+
+    @staticmethod
+    def disable_tenant_qr(user, tenant_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_tenant_qr(user, tenant_id)
+        return QrCodeBusinessLogicLayer.disable(user, qr)
+
+    @staticmethod
+    def disable_branch_qr(user, branch_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_branch_qr(user, branch_id)
+        return QrCodeBusinessLogicLayer.disable(user, qr)
+
+    @staticmethod
+    def regenerate_tenant_qr(user, tenant_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_tenant_qr(user, tenant_id)
+        return QrCodeBusinessLogicLayer.regenerate(user, qr)
+
+    @staticmethod
+    def regenerate_branch_qr(user, branch_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_branch_qr(user, branch_id)
+        return QrCodeBusinessLogicLayer.regenerate(user, qr)
+
+    @staticmethod
+    def set_tenant_qr_destination(user, tenant_id, destination_type: str) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_tenant_qr(user, tenant_id)
+        return QrCodeBusinessLogicLayer.set_destination(user, qr, destination_type)
+
+    @staticmethod
+    def set_branch_qr_destination(user, branch_id, destination_type: str) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_branch_qr(user, branch_id)
+        return QrCodeBusinessLogicLayer.set_destination(user, qr, destination_type)
+
+    @staticmethod
+    def _qr_for_enable(entity_type: str, entity_id) -> QrCode:
+        qr = qr_dal.get_latest_for_entity(entity_type, entity_id)
+        if qr is None:
+            raise QrNotFoundException()
+        return qr
+
+    @staticmethod
+    def _load_owned_tenant(user, tenant_id) -> Tenant:
+        tenant = (
+            Tenant.objects.select_related("owner")
+            .filter(id=tenant_id)
+            .first()
+        )
+        if tenant is None:
+            raise TenantNotFoundException()
+        tenant.owner_user_id = tenant.owner.user_id  # type: ignore[attr-defined]
+        try:
+            _assert_owns_tenant(user, tenant)
+        except TenantPermissionDeniedException:
+            raise UnauthorizedQrAccessException()
+        return tenant
+
+    @staticmethod
+    def _load_owned_branch(user, branch_id) -> Branch:
+        branch = (
+            Branch.objects.select_related("tenant", "tenant__owner")
+            .filter(id=branch_id)
+            .first()
+        )
+        if branch is None:
+            raise BranchNotFoundException()
+        owner = getattr(branch.tenant, "owner", None)
+        branch.owner_user_id = owner.user_id if owner is not None else None
+        try:
+            _assert_owns_branch(user, branch)
+        except (BranchPermissionDeniedException, TenantPermissionDeniedException):
+            raise UnauthorizedQrAccessException()
+        return branch
+
+    @staticmethod
+    def _schedule_cache_invalidation(qr: QrCode) -> None:
+        entity_type = qr.entity_type
+        entity_id = qr.entity_id
+
+        def _invalidate():
+            from tenants.selectors.tenant_dal import (
+                BranchDataAccessLayer,
+                TenantDataAccessLayer,
+            )
+
+            if entity_type == QrEntityType.TENANT:
+                tenant = (
+                    Tenant.objects.select_related("owner")
+                    .filter(id=entity_id)
+                    .first()
+                )
+                if tenant is not None:
+                    TenantDataAccessLayer.invalidate_tenant_cache(
+                        tenant.id, tenant.owner.user_id
+                    )
+                return
+            if entity_type == QrEntityType.BRANCH:
+                branch = Branch.objects.filter(id=entity_id).first()
+                if branch is not None:
+                    BranchDataAccessLayer.invalidate_branch_cache(
+                        branch.tenant_id, branch.id
+                    )
+
+        transaction.on_commit(_invalidate)
 
     @staticmethod
     def _assert_can_manage(user, qr: QrCode) -> None:

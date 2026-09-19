@@ -24,6 +24,26 @@ urlpatterns = [
          TenantSettingsPatchAPIView.as_view(),
          name="tenant-settings-patch"
          ),
+    path("<uuid:tenant_id>/qr/",
+         TenantQrRetrieveAPIView.as_view(),
+         name="tenant-qr"
+         ),
+    path("<uuid:tenant_id>/qr/enable/",
+         TenantQrEnableAPIView.as_view(),
+         name="tenant-qr-enable"
+         ),
+    path("<uuid:tenant_id>/qr/disable/",
+         TenantQrDisableAPIView.as_view(),
+         name="tenant-qr-disable"
+         ),
+    path("<uuid:tenant_id>/qr/regenerate/",
+         TenantQrRegenerateAPIView.as_view(),
+         name="tenant-qr-regenerate"
+         ),
+    path("<uuid:tenant_id>/qr/destination/",
+         TenantQrDestinationAPIView.as_view(),
+         name="tenant-qr-destination"
+         ),
     path("",
          TenantListAPIView.as_view(),
          name="tenant-list"

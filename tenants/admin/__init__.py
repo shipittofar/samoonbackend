@@ -4,3 +4,4 @@ from .tenant import (
     BranchAdmin,
     WorkingHourAdmin
 )
+from .qr import QrCodeAdmin

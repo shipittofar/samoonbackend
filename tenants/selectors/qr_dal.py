@@ -29,6 +29,18 @@ def get_active_for_entity(entity_type: str, entity_id) -> QrCode | None:
     ).first()
 
 
+def get_latest_for_entity(entity_type: str, entity_id) -> QrCode | None:
+    """Active QR if present, otherwise the most recently updated row."""
+    active = get_active_for_entity(entity_type, entity_id)
+    if active is not None:
+        return active
+    return (
+        QrCode.objects.filter(entity_type=entity_type, entity_id=entity_id)
+        .order_by("-updated_at", "-created_at")
+        .first()
+    )
+
+
 def tenant_entity_type() -> str:
     return QrEntityType.TENANT
 
