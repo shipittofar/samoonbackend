@@ -15,7 +15,9 @@ from access.models import (
     StaffMembership,
 )
 from access.services.assignment_bll import assignment_bll
+from access.services.membership_bll import membership_service
 from access.authorization.admin_role_protection import filter_roles_queryset_for_viewer
+from core.exceptions import StaffMembershipAlreadyRemovedException
 from tenants.models import Branch
 
 _STAFF_ASSIGNMENT_WRITE_BLOCKED = (
@@ -228,12 +230,49 @@ class StaffAssignmentInline(admin.TabularInline):
 
 @admin.register(StaffMembership)
 class StaffMembershipAdmin(admin.ModelAdmin):
+    """
+    Admin delete is a BLL soft-remove (status=removed), not a CASCADE hard delete.
+
+    StaffAssignment.membership uses on_delete=CASCADE, so Django's NestedObjects
+    collector would otherwise require delete_staffassignment. Hard-deleting
+    assignments is intentionally disabled (revoke/audit history). Soft-remove
+    keeps assignment rows and matches membership_service.remove_membership.
+    """
+
     list_display = ["user", "tenant", "status", "invited_by", "joined_at", "created_at"]
     list_filter = ["status", "tenant"]
     search_fields = ["user__phone_number", "user__email", "tenant__name"]
     autocomplete_fields = ["user", "tenant", "invited_by"]
     readonly_fields = ["id", "created_at", "updated_at"]
     inlines = [StaffAssignmentInline]
+
+    def get_deleted_objects(self, objs, request):
+        # Soft-remove does not delete related StaffAssignment / location rows.
+        deleted_objects = [str(obj) for obj in objs]
+        model_count = {StaffMembership._meta.verbose_name: len(list(objs))}
+        perms_needed = set()
+        protected = []
+        return deleted_objects, model_count, perms_needed, protected
+
+    def delete_model(self, request, obj):
+        self._soft_remove_membership(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            self._soft_remove_membership(request, obj)
+
+    def _soft_remove_membership(self, request, obj):
+        try:
+            membership_service.remove_membership(
+                tenant_id=obj.tenant_id,
+                membership_id=obj.id,
+            )
+        except StaffMembershipAlreadyRemovedException:
+            self.message_user(
+                request,
+                f"Skipped already-removed membership {obj}.",
+                level=messages.INFO,
+            )
 
     def save_formset(self, request, form, formset, change):
         if formset.model is StaffAssignment:

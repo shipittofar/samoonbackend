@@ -198,7 +198,28 @@ class TenantBusinessLogicLayer:
 
         _assert_owns_tenant(user, tenant)
 
-        return tenant_dal.inactive_tenant(tenant)
+        tenant = tenant_dal.inactive_tenant(tenant)
+        TenantBusinessLogicLayer._remove_staff_memberships_for_tenant(tenant)
+        return tenant
+
+    @staticmethod
+    def _remove_staff_memberships_for_tenant(tenant: Tenant) -> None:
+        """Soft-remove memberships; StaffAssignment rows stay as grant/revoke history."""
+        from access.models import StaffMembership, StaffMembershipStatus
+        from access.services.membership_bll import membership_service
+        from core.exceptions import StaffMembershipAlreadyRemovedException
+
+        memberships = StaffMembership.objects.filter(tenant_id=tenant.id).exclude(
+            status=StaffMembershipStatus.REMOVED
+        )
+        for membership in memberships:
+            try:
+                membership_service.remove_membership(
+                    tenant_id=tenant.id,
+                    membership_id=membership.id,
+                )
+            except StaffMembershipAlreadyRemovedException:
+                continue
 
     @staticmethod
     def get_my_tenants(user):

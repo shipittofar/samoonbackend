@@ -1,9 +1,11 @@
 # apps/tenants/admin.py
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.utils.translation import gettext_lazy as _
 
+from core.exceptions import TenantNotFoundException
 from tenants.models import Owner, Tenant, Branch, WorkingHour
+from tenants.services.tenant_bll import TenantBusinessLogicLayer
 from tenants.settings_cleanup import (
     TenantSettingsContractError,
     project_owner_tenant_settings,
@@ -121,6 +123,15 @@ class OwnerAdmin(admin.ModelAdmin):
 
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
+    """
+    Admin delete is BLL deactivation (status=inactive), not Model.delete().
+
+    NestedObjects would follow Tenant → StaffMembership CASCADE →
+    StaffAssignment CASCADE and require delete_staffassignment. Assignments
+    are revoke-only history; tenant_bll.delete_tenant inactivates the tenant
+    and soft-removes memberships so assignment rows stay in place.
+    """
+
     form = TenantAdminForm
     list_display = (
         "name",
@@ -154,6 +165,33 @@ class TenantAdmin(admin.ModelAdmin):
     @admin.display(description=_("Branches"))
     def branch_count(self, obj):
         return obj.branches.count()
+
+    def get_deleted_objects(self, objs, request):
+        deleted_objects = [str(obj) for obj in objs]
+        model_count = {Tenant._meta.verbose_name: len(list(objs))}
+        perms_needed = set()
+        protected = []
+        return deleted_objects, model_count, perms_needed, protected
+
+    def delete_model(self, request, obj):
+        self._soft_remove_tenant(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            self._soft_remove_tenant(request, obj)
+
+    def _soft_remove_tenant(self, request, obj):
+        try:
+            TenantBusinessLogicLayer.delete_tenant(
+                user=request.user,
+                tenant_id=obj.id,
+            )
+        except TenantNotFoundException:
+            self.message_user(
+                request,
+                f"Skipped missing tenant {obj}.",
+                level=messages.INFO,
+            )
 
     def save_model(self, request, obj, form, change):
         """

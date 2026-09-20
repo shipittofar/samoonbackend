@@ -2,12 +2,20 @@
 import uuid
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from access.admin.access_admin import StaffMembershipAdmin
-from access.models import StaffAssignment, StaffMembership, StaffMembershipStatus
+from access.models import (
+    AssignmentMode,
+    AssignmentStatus,
+    Role,
+    StaffAssignment,
+    StaffMembership,
+    StaffMembershipStatus,
+)
 from tenants.models import Owner, Tenant
 
 User = get_user_model()
@@ -96,3 +104,137 @@ class StaffMembershipAdminIntegrationTests(TestCase):
                 tenant=self.tenant,
             ).exists()
         )
+
+
+def _create_assignment(*, membership, role, status=AssignmentStatus.ACTIVE):
+    return StaffAssignment.objects.create(
+        membership=membership,
+        role=role,
+        all_locations=True,
+        status=status,
+        mode=AssignmentMode.MANAGE,
+    )
+
+
+class StaffMembershipAdminDeleteTests(TestCase):
+    def setUp(self):
+        self.admin_user = _make_user()
+        self.staff_user = _make_user(is_staff=False, is_superuser=False)
+        owner = Owner.objects.create(user=self.admin_user)
+        self.tenant = Tenant.objects.create(owner=owner, name=f"Tenant {uuid.uuid4().hex[:6]}")
+        self.membership = StaffMembership.objects.create(
+            user=self.staff_user,
+            tenant=self.tenant,
+            status=StaffMembershipStatus.ACTIVE,
+        )
+        self.role = Role.objects.get(slug="manager")
+        self.waiter_role = Role.objects.get(slug="waiter")
+        self.client = Client()
+        self.client.force_login(self.admin_user)
+
+    def _delete_url(self, membership=None):
+        membership = membership or self.membership
+        return reverse("admin:access_staffmembership_delete", args=[membership.id])
+
+    def test_delete_membership_with_active_assignment_soft_removes(self):
+        assignment = _create_assignment(membership=self.membership, role=self.role)
+        response = self.client.post(self._delete_url(), {"post": "yes"})
+        self.assertEqual(response.status_code, 302)
+
+        self.membership.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)
+        self.assertEqual(assignment.status, AssignmentStatus.ACTIVE)
+        self.assertEqual(assignment.membership_id, self.membership.id)
+
+    def test_delete_membership_with_revoked_assignment_keeps_audit_row(self):
+        assignment = _create_assignment(
+            membership=self.membership,
+            role=self.role,
+            status=AssignmentStatus.REVOKED,
+        )
+        response = self.client.post(self._delete_url(), {"post": "yes"})
+        self.assertEqual(response.status_code, 302)
+
+        self.membership.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)
+        self.assertEqual(assignment.status, AssignmentStatus.REVOKED)
+        self.assertTrue(StaffAssignment.objects.filter(id=assignment.id).exists())
+
+    def test_delete_membership_with_active_and_revoked_assignments(self):
+        active = _create_assignment(membership=self.membership, role=self.role)
+        revoked = _create_assignment(
+            membership=self.membership,
+            role=self.waiter_role,
+            status=AssignmentStatus.REVOKED,
+        )
+        response = self.client.post(self._delete_url(), {"post": "yes"})
+        self.assertEqual(response.status_code, 302)
+
+        self.membership.refresh_from_db()
+        active.refresh_from_db()
+        revoked.refresh_from_db()
+        self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)
+        self.assertEqual(active.status, AssignmentStatus.ACTIVE)
+        self.assertEqual(revoked.status, AssignmentStatus.REVOKED)
+        self.assertEqual(StaffAssignment.objects.filter(membership=self.membership).count(), 2)
+
+    def test_delete_confirmation_does_not_require_assignment_delete_perm(self):
+        _create_assignment(
+            membership=self.membership,
+            role=self.role,
+            status=AssignmentStatus.REVOKED,
+        )
+        response = self.client.get(self._delete_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "doesn't have permission to delete")
+        self.assertNotContains(response, "staff assignment")
+
+    def test_already_removed_membership_is_skipped(self):
+        self.membership.status = StaffMembershipStatus.REMOVED
+        self.membership.save(update_fields=["status"])
+        response = self.client.post(self._delete_url(), {"post": "yes"})
+        self.assertEqual(response.status_code, 302)
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)
+        self.assertTrue(StaffMembership.objects.filter(id=self.membership.id).exists())
+
+    def test_insufficient_permissions_cannot_delete_membership(self):
+        limited = _make_user(is_superuser=False, is_staff=True)
+        view_perm = Permission.objects.get(
+            content_type__app_label="access",
+            codename="view_staffmembership",
+        )
+        limited.user_permissions.add(view_perm)
+        client = Client()
+        client.force_login(limited)
+
+        response = client.post(self._delete_url(), {"post": "yes"})
+        self.assertIn(response.status_code, (403, 302))
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.status, StaffMembershipStatus.ACTIVE)
+
+    def test_delete_allowed_without_delete_staffassignment_permission(self):
+        limited = _make_user(is_superuser=False, is_staff=True)
+        perms = Permission.objects.filter(
+            content_type__app_label="access",
+            codename__in=[
+                "view_staffmembership",
+                "delete_staffmembership",
+                "view_staffassignment",
+            ],
+        )
+        limited.user_permissions.add(*perms)
+        _create_assignment(
+            membership=self.membership,
+            role=self.role,
+            status=AssignmentStatus.REVOKED,
+        )
+        client = Client()
+        client.force_login(limited)
+
+        response = client.post(self._delete_url(), {"post": "yes"})
+        self.assertEqual(response.status_code, 302)
+        self.membership.refresh_from_db()
+        self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)

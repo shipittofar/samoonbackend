@@ -242,4 +242,8 @@ class TenantBusinessLogicLayer:
         if tenant is None:
             raise TenantNotFoundException()
 
-        return tenant_dal.inactive_tenant(tenant)
+        tenant = tenant_dal.inactive_tenant(tenant)
+        from tenants.services.tenant_bll import TenantBusinessLogicLayer
+
+        TenantBusinessLogicLayer._remove_staff_memberships_for_tenant(tenant)
+        return tenant
