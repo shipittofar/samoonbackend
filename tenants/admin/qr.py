@@ -47,7 +47,10 @@ class QrCodeAdmin(admin.ModelAdmin):
             "description": _(
                 "Regenerate issues a new printed code (old /qr/<code>/ returns 410). "
                 "Changing destination keeps the same printed code. "
-                "Enable/Disable via actions. Tenant QR destinations stay tenant."
+                "Enable/Disable via actions. Tenant QR destinations stay tenant. "
+                "Menu QR destinations stay menu. Reservation-page QR destinations stay reservation. "
+                "entity_type menu/reservation rows are owned by a Branch UUID "
+                "(storefront resource, not a booking record)."
             ),
         }),
         (_("Timestamps"), {"fields": ("id", "created_at", "updated_at")}),

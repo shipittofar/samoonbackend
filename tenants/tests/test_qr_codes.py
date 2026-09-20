@@ -52,6 +52,16 @@ class QrGenerationTests(TestCase):
         )
         self.assertNotEqual(tenant_qr.code, branch_qr.code)
         self.assertEqual(branch_qr.destination_type, QrDestinationType.BRANCH)
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        reservation_qr = QrCode.objects.get(
+            entity_type=QrEntityType.RESERVATION, entity_id=branch.id, is_active=True
+        )
+        self.assertEqual(menu_qr.destination_type, QrDestinationType.MENU)
+        self.assertEqual(reservation_qr.destination_type, QrDestinationType.RESERVATION)
+        codes = {tenant_qr.code, branch_qr.code, menu_qr.code, reservation_qr.code}
+        self.assertEqual(len(codes), 4)
 
     def test_ensure_is_idempotent(self):
         _, tenant = make_tenant()
@@ -317,3 +327,140 @@ class QrResolverUnitTests(TestCase):
         branch.delete()
         with self.assertRaises(BranchNotFoundException):
             QrCodeBusinessLogicLayer.resolve_redirect_url(code)
+
+
+@override_settings(PUBLIC_SITE_URL="http://frontend.test")
+class MenuReservationQrTests(TestCase):
+    def test_ensure_for_menu_is_idempotent(self):
+        _, tenant = make_tenant()
+        branch = make_branch(tenant)
+        first = QrCodeBusinessLogicLayer.ensure_for_menu(branch)
+        second = QrCodeBusinessLogicLayer.ensure_for_menu(branch)
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(
+            QrCode.objects.filter(
+                entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+            ).count(),
+            1,
+        )
+
+    def test_ensure_for_reservation_is_idempotent(self):
+        _, tenant = make_tenant()
+        branch = make_branch(tenant)
+        first = QrCodeBusinessLogicLayer.ensure_for_reservation(branch)
+        second = QrCodeBusinessLogicLayer.ensure_for_reservation(branch)
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(
+            QrCode.objects.filter(
+                entity_type=QrEntityType.RESERVATION,
+                entity_id=branch.id,
+                is_active=True,
+            ).count(),
+            1,
+        )
+
+    def test_menu_qr_is_independent_of_branch_qr(self):
+        _, tenant = make_tenant()
+        branch = make_branch(tenant)
+        branch_qr = QrCode.objects.get(
+            entity_type=QrEntityType.BRANCH, entity_id=branch.id, is_active=True
+        )
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        self.assertNotEqual(branch_qr.code, menu_qr.code)
+        self.assertEqual(menu_qr.entity_type, QrEntityType.MENU)
+        self.assertEqual(menu_qr.entity_id, branch.id)
+
+    def test_menu_qr_redirects_to_menu_storefront(self):
+        _, tenant = make_tenant()
+        branch = make_branch(tenant)
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        response = APIClient().get(f"/qr/{menu_qr.code}/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"http://frontend.test/{tenant.slug}/{branch.slug}/menu",
+        )
+
+    def test_reservation_qr_redirects_to_reservation_storefront(self):
+        _, tenant = make_tenant()
+        branch = make_branch(tenant)
+        reservation_qr = QrCode.objects.get(
+            entity_type=QrEntityType.RESERVATION, entity_id=branch.id, is_active=True
+        )
+        response = APIClient().get(f"/qr/{reservation_qr.code}/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"http://frontend.test/{tenant.slug}/{branch.slug}/reservation",
+        )
+
+    def test_branch_qr_destination_menu_does_not_replace_menu_entity_qr(self):
+        owner, tenant = make_tenant()
+        branch = make_branch(tenant)
+        branch_qr = QrCode.objects.get(
+            entity_type=QrEntityType.BRANCH, entity_id=branch.id, is_active=True
+        )
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        QrCodeBusinessLogicLayer.set_destination(
+            owner, branch_qr, QrDestinationType.MENU
+        )
+        branch_qr.refresh_from_db()
+        menu_qr.refresh_from_db()
+        self.assertEqual(branch_qr.destination_type, QrDestinationType.MENU)
+        self.assertNotEqual(branch_qr.code, menu_qr.code)
+        self.assertEqual(menu_qr.entity_type, QrEntityType.MENU)
+
+    def test_menu_qr_slug_change_keeps_resolver_valid(self):
+        _, tenant = make_tenant()
+        branch = make_branch(tenant)
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        branch.slug = "new-menu-branch"
+        branch.save(update_fields=["slug", "updated_at"])
+        response = APIClient().get(f"/qr/{menu_qr.code}/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response["Location"],
+            f"http://frontend.test/{tenant.slug}/new-menu-branch/menu",
+        )
+
+    def test_disabled_menu_qr_returns_gone(self):
+        owner, tenant = make_tenant()
+        branch = make_branch(tenant)
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        QrCodeBusinessLogicLayer.disable(owner, menu_qr)
+        response = APIClient().get(f"/qr/{menu_qr.code}/")
+        self.assertEqual(response.status_code, 410)
+
+    def test_deleted_branch_menu_qr_unavailable(self):
+        _, tenant = make_tenant()
+        branch = make_branch(tenant)
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        code = menu_qr.code
+        branch.delete()
+        with self.assertRaises(BranchNotFoundException):
+            QrCodeBusinessLogicLayer.resolve_redirect_url(code)
+
+    def test_menu_destination_cannot_be_branch(self):
+        from core.exceptions.qr import QrInvalidDestinationException
+
+        owner, tenant = make_tenant()
+        branch = make_branch(tenant)
+        menu_qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU, entity_id=branch.id, is_active=True
+        )
+        with self.assertRaises(QrInvalidDestinationException):
+            QrCodeBusinessLogicLayer.set_destination(
+                owner, menu_qr, QrDestinationType.BRANCH
+            )

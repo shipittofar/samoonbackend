@@ -179,3 +179,125 @@ class BranchQrDestinationAPIView(APIView):
             serializer.validated_data["destination_type"],
         )
         return _qr_response(qr, request)
+
+
+class _BranchResourceQrRetrieveAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+    getter = None
+
+    def get(self, request, branch_id, *args, **kwargs):
+        qr = self.getter(request.user, branch_id)
+        return _qr_response(qr, request)
+
+
+class _BranchResourceQrEnableAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+    enabler = None
+
+    def post(self, request, branch_id, *args, **kwargs):
+        qr = self.enabler(request.user, branch_id)
+        return _qr_response(qr, request)
+
+
+class _BranchResourceQrDisableAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+    disabler = None
+
+    def post(self, request, branch_id, *args, **kwargs):
+        qr = self.disabler(request.user, branch_id)
+        return _qr_response(qr, request)
+
+
+class _BranchResourceQrRegenerateAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+    regenerator = None
+
+    def post(self, request, branch_id, *args, **kwargs):
+        qr = self.regenerator(request.user, branch_id)
+        return _qr_response(qr, request)
+
+
+@extend_schema(
+    tags=["Menu - QR"],
+    summary="Retrieve menu QR metadata",
+    responses={200: QrManagementResponseSerializer},
+)
+class MenuQrRetrieveAPIView(_BranchResourceQrRetrieveAPIView):
+    getter = staticmethod(QrCodeBusinessLogicLayer.get_menu_qr)
+
+
+@extend_schema(
+    tags=["Menu - QR"],
+    summary="Enable menu QR",
+    request=None,
+    responses={200: QrManagementResponseSerializer},
+)
+class MenuQrEnableAPIView(_BranchResourceQrEnableAPIView):
+    enabler = staticmethod(QrCodeBusinessLogicLayer.enable_menu_qr)
+
+
+@extend_schema(
+    tags=["Menu - QR"],
+    summary="Disable menu QR",
+    request=None,
+    responses={200: QrManagementResponseSerializer},
+)
+class MenuQrDisableAPIView(_BranchResourceQrDisableAPIView):
+    disabler = staticmethod(QrCodeBusinessLogicLayer.disable_menu_qr)
+
+
+@extend_schema(
+    tags=["Menu - QR"],
+    summary="Regenerate menu QR",
+    description=(
+        "Deactivates the current printed menu QR and issues a new code. "
+        "The old /qr/<code>/ URL returns 410."
+    ),
+    request=None,
+    responses={200: QrManagementResponseSerializer},
+)
+class MenuQrRegenerateAPIView(_BranchResourceQrRegenerateAPIView):
+    regenerator = staticmethod(QrCodeBusinessLogicLayer.regenerate_menu_qr)
+
+
+@extend_schema(
+    tags=["Reservations - QR"],
+    summary="Retrieve reservation-page QR metadata",
+    responses={200: QrManagementResponseSerializer},
+)
+class ReservationQrRetrieveAPIView(_BranchResourceQrRetrieveAPIView):
+    getter = staticmethod(QrCodeBusinessLogicLayer.get_reservation_qr)
+
+
+@extend_schema(
+    tags=["Reservations - QR"],
+    summary="Enable reservation-page QR",
+    request=None,
+    responses={200: QrManagementResponseSerializer},
+)
+class ReservationQrEnableAPIView(_BranchResourceQrEnableAPIView):
+    enabler = staticmethod(QrCodeBusinessLogicLayer.enable_reservation_qr)
+
+
+@extend_schema(
+    tags=["Reservations - QR"],
+    summary="Disable reservation-page QR",
+    request=None,
+    responses={200: QrManagementResponseSerializer},
+)
+class ReservationQrDisableAPIView(_BranchResourceQrDisableAPIView):
+    disabler = staticmethod(QrCodeBusinessLogicLayer.disable_reservation_qr)
+
+
+@extend_schema(
+    tags=["Reservations - QR"],
+    summary="Regenerate reservation-page QR",
+    description=(
+        "Deactivates the current printed reservation QR and issues a new code. "
+        "The old /qr/<code>/ URL returns 410."
+    ),
+    request=None,
+    responses={200: QrManagementResponseSerializer},
+)
+class ReservationQrRegenerateAPIView(_BranchResourceQrRegenerateAPIView):
+    regenerator = staticmethod(QrCodeBusinessLogicLayer.regenerate_reservation_qr)

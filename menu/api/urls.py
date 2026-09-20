@@ -13,10 +13,36 @@ Sections:
 from django.urls import path
 
 from menu.api.views import *
+from tenants.api.views.qr_manage import (
+    MenuQrDisableAPIView,
+    MenuQrEnableAPIView,
+    MenuQrRegenerateAPIView,
+    MenuQrRetrieveAPIView,
+)
 
 app_name = "menu"
 
 urlpatterns = [
+    path(
+        "branches/<uuid:branch_id>/qr/",
+        MenuQrRetrieveAPIView.as_view(),
+        name="menu-branch-qr",
+    ),
+    path(
+        "branches/<uuid:branch_id>/qr/enable/",
+        MenuQrEnableAPIView.as_view(),
+        name="menu-branch-qr-enable",
+    ),
+    path(
+        "branches/<uuid:branch_id>/qr/disable/",
+        MenuQrDisableAPIView.as_view(),
+        name="menu-branch-qr-disable",
+    ),
+    path(
+        "branches/<uuid:branch_id>/qr/regenerate/",
+        MenuQrRegenerateAPIView.as_view(),
+        name="menu-branch-qr-regenerate",
+    ),
     # -----------------------------------------------------------------
     # Tags — branch-scoped CRUD + storefront
     # -----------------------------------------------------------------

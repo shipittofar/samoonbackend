@@ -6,6 +6,10 @@ from django.db import models
 class QrEntityType(models.TextChoices):
     TENANT = "tenant", "Tenant"
     BRANCH = "branch", "Branch"
+    # Storefront resources owned by a Branch. entity_id is the Branch UUID.
+    # There is no Menu aggregate and no reservation-page aggregate in the domain.
+    MENU = "menu", "Menu"
+    RESERVATION = "reservation", "Reservation"
 
 
 class QrDestinationType(models.TextChoices):

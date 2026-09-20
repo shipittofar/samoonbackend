@@ -32,10 +32,46 @@ logger = logging.getLogger(__name__)
 MAX_CODE_ATTEMPTS = 12
 
 
+BRANCH_OWNED_ENTITY_TYPES = frozenset(
+    {
+        QrEntityType.BRANCH,
+        QrEntityType.MENU,
+        QrEntityType.RESERVATION,
+    }
+)
+
+ALLOWED_DESTINATIONS = {
+    QrEntityType.TENANT: frozenset({QrDestinationType.TENANT}),
+    QrEntityType.BRANCH: frozenset(
+        {
+            QrDestinationType.TENANT,
+            QrDestinationType.BRANCH,
+            QrDestinationType.MENU,
+            QrDestinationType.RESERVATION,
+        }
+    ),
+    QrEntityType.MENU: frozenset({QrDestinationType.MENU}),
+    QrEntityType.RESERVATION: frozenset({QrDestinationType.RESERVATION}),
+}
+
+
 def _default_destination(entity_type: str) -> str:
     if entity_type == QrEntityType.TENANT:
         return QrDestinationType.TENANT
+    if entity_type == QrEntityType.MENU:
+        return QrDestinationType.MENU
+    if entity_type == QrEntityType.RESERVATION:
+        return QrDestinationType.RESERVATION
     return QrDestinationType.BRANCH
+
+
+def _owned_destination(qr: QrCode) -> str:
+    """Ownership drives Menu/Reservation redirect; Branch still uses destination_type."""
+    if qr.entity_type == QrEntityType.MENU:
+        return QrDestinationType.MENU
+    if qr.entity_type == QrEntityType.RESERVATION:
+        return QrDestinationType.RESERVATION
+    return qr.destination_type or _default_destination(qr.entity_type)
 
 
 class QrCodeBusinessLogicLayer:
@@ -57,6 +93,22 @@ class QrCodeBusinessLogicLayer:
         )
 
     @staticmethod
+    def ensure_for_menu(branch: Branch) -> QrCode:
+        return QrCodeBusinessLogicLayer._ensure(
+            entity_type=QrEntityType.MENU,
+            entity_id=branch.id,
+            destination_type=QrDestinationType.MENU,
+        )
+
+    @staticmethod
+    def ensure_for_reservation(branch: Branch) -> QrCode:
+        return QrCodeBusinessLogicLayer._ensure(
+            entity_type=QrEntityType.RESERVATION,
+            entity_id=branch.id,
+            destination_type=QrDestinationType.RESERVATION,
+        )
+
+    @staticmethod
     def attach_after_save(instance) -> None:
         if instance is None or getattr(instance, "pk", None) is None:
             return
@@ -64,6 +116,8 @@ class QrCodeBusinessLogicLayer:
             QrCodeBusinessLogicLayer.ensure_for_tenant(instance)
         elif isinstance(instance, Branch):
             QrCodeBusinessLogicLayer.ensure_for_branch(instance)
+            QrCodeBusinessLogicLayer.ensure_for_menu(instance)
+            QrCodeBusinessLogicLayer.ensure_for_reservation(instance)
 
     @staticmethod
     def _ensure(*, entity_type: str, entity_id, destination_type: str) -> QrCode:
@@ -138,7 +192,7 @@ class QrCodeBusinessLogicLayer:
             raise QrDisabledException()
 
         tenant, branch = QrCodeBusinessLogicLayer._load_entities(qr)
-        dest_type = qr.destination_type or _default_destination(qr.entity_type)
+        dest_type = _owned_destination(qr)
         path = destination_path(
             dest_type,
             tenant_slug=tenant.slug,
@@ -160,7 +214,7 @@ class QrCodeBusinessLogicLayer:
                 raise TenantNotFoundException()
             return tenant, None
 
-        if qr.entity_type == QrEntityType.BRANCH:
+        if qr.entity_type in BRANCH_OWNED_ENTITY_TYPES:
             branch = (
                 Branch.objects.select_related("tenant")
                 .filter(id=qr.entity_id)
@@ -207,9 +261,13 @@ class QrCodeBusinessLogicLayer:
         QrCodeBusinessLogicLayer._assert_can_manage(user, qr)
         if destination_type not in QrDestinationType.values:
             raise QrInvalidDestinationException()
-        if qr.entity_type == QrEntityType.TENANT and destination_type != QrDestinationType.TENANT:
-            # Tenant QRs only resolve to the tenant public URL in v1.
+        allowed = ALLOWED_DESTINATIONS.get(qr.entity_type)
+        if allowed is None:
+            raise QrInvalidDestinationException()
+        if qr.entity_type == QrEntityType.TENANT:
             destination_type = QrDestinationType.TENANT
+        elif destination_type not in allowed:
+            raise QrInvalidDestinationException()
         qr.destination_type = destination_type
         qr.save(update_fields=["destination_type", "updated_at"])
         QrCodeBusinessLogicLayer._schedule_cache_invalidation(qr)
@@ -292,6 +350,64 @@ class QrCodeBusinessLogicLayer:
         return QrCodeBusinessLogicLayer.set_destination(user, qr, destination_type)
 
     @staticmethod
+    def get_menu_qr(user, branch_id) -> QrCode:
+        return QrCodeBusinessLogicLayer._get_branch_resource_qr(
+            user, branch_id, QrEntityType.MENU
+        )
+
+    @staticmethod
+    def get_reservation_qr(user, branch_id) -> QrCode:
+        return QrCodeBusinessLogicLayer._get_branch_resource_qr(
+            user, branch_id, QrEntityType.RESERVATION
+        )
+
+    @staticmethod
+    def enable_menu_qr(user, branch_id) -> QrCode:
+        return QrCodeBusinessLogicLayer._enable_branch_resource_qr(
+            user, branch_id, QrEntityType.MENU
+        )
+
+    @staticmethod
+    def enable_reservation_qr(user, branch_id) -> QrCode:
+        return QrCodeBusinessLogicLayer._enable_branch_resource_qr(
+            user, branch_id, QrEntityType.RESERVATION
+        )
+
+    @staticmethod
+    def disable_menu_qr(user, branch_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_menu_qr(user, branch_id)
+        return QrCodeBusinessLogicLayer.disable(user, qr)
+
+    @staticmethod
+    def disable_reservation_qr(user, branch_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_reservation_qr(user, branch_id)
+        return QrCodeBusinessLogicLayer.disable(user, qr)
+
+    @staticmethod
+    def regenerate_menu_qr(user, branch_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_menu_qr(user, branch_id)
+        return QrCodeBusinessLogicLayer.regenerate(user, qr)
+
+    @staticmethod
+    def regenerate_reservation_qr(user, branch_id) -> QrCode:
+        qr = QrCodeBusinessLogicLayer.get_reservation_qr(user, branch_id)
+        return QrCodeBusinessLogicLayer.regenerate(user, qr)
+
+    @staticmethod
+    def _get_branch_resource_qr(user, branch_id, entity_type: str) -> QrCode:
+        branch = QrCodeBusinessLogicLayer._load_owned_branch(user, branch_id)
+        qr = qr_dal.get_active_for_entity(entity_type, branch.id)
+        if qr is None:
+            raise QrNotFoundException()
+        return qr
+
+    @staticmethod
+    def _enable_branch_resource_qr(user, branch_id, entity_type: str) -> QrCode:
+        branch = QrCodeBusinessLogicLayer._load_owned_branch(user, branch_id)
+        qr = QrCodeBusinessLogicLayer._qr_for_enable(entity_type, branch.id)
+        return QrCodeBusinessLogicLayer.enable(user, qr)
+
+    @staticmethod
     def _qr_for_enable(entity_type: str, entity_id) -> QrCode:
         qr = qr_dal.get_latest_for_entity(entity_type, entity_id)
         if qr is None:
@@ -353,7 +469,7 @@ class QrCodeBusinessLogicLayer:
                         tenant.id, tenant.owner.user_id
                     )
                 return
-            if entity_type == QrEntityType.BRANCH:
+            if entity_type in BRANCH_OWNED_ENTITY_TYPES:
                 branch = Branch.objects.filter(id=entity_id).first()
                 if branch is not None:
                     BranchDataAccessLayer.invalidate_branch_cache(
@@ -375,7 +491,7 @@ class QrCodeBusinessLogicLayer:
                 raise UnauthorizedQrAccessException()
             return
 
-        if qr.entity_type == QrEntityType.BRANCH:
+        if qr.entity_type in BRANCH_OWNED_ENTITY_TYPES:
             branch = (
                 Branch.objects.select_related("tenant", "tenant__owner")
                 .filter(id=qr.entity_id)

@@ -218,6 +218,132 @@ class BranchQrManagementAPITests(TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+@override_settings(PUBLIC_SITE_URL="http://frontend.test")
+class MenuQrManagementAPITests(TestCase):
+    def setUp(self):
+        self.owner, self.tenant = make_tenant()
+        self.branch = make_branch(self.tenant, name="Menu QR Branch")
+        self.other_owner, self.other_tenant = make_tenant()
+        self.other_branch = make_branch(self.other_tenant)
+        self.qr = QrCode.objects.get(
+            entity_type=QrEntityType.MENU,
+            entity_id=self.branch.id,
+            is_active=True,
+        )
+        self.client = _auth_client(self.owner)
+        self.other = _auth_client(self.other_owner)
+        self.url = f"/api/menu/branches/{self.branch.id}/qr/"
+
+    def test_owner_retrieves_own_menu_qr(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["code"], self.qr.code)
+        self.assertEqual(response.data["entity_type"], "menu")
+        self.assertEqual(response.data["entity_id"], str(self.branch.id))
+        self.assertEqual(response.data["destination_type"], "menu")
+        self.assertTrue(response.data["url"].endswith(f"/qr/{self.qr.code}"))
+
+    def test_unauthenticated_retrieve_rejected(self):
+        response = APIClient().get(self.url)
+        self.assertEqual(response.status_code, 401)
+
+    def test_other_owner_cannot_retrieve(self):
+        response = self.other.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_owner_can_disable_and_resolver_returns_410(self):
+        response = self.client.post(f"{self.url}disable/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["is_active"])
+        self.assertEqual(APIClient().get(f"/qr/{self.qr.code}/").status_code, 410)
+
+    def test_other_owner_cannot_disable(self):
+        response = self.other.post(f"{self.url}disable/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_owner_can_enable_after_disable(self):
+        self.client.post(f"{self.url}disable/")
+        response = self.client.post(f"{self.url}enable/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_active"])
+        self.assertEqual(response.data["code"], self.qr.code)
+
+    def test_other_owner_cannot_enable(self):
+        self.client.post(f"{self.url}disable/")
+        response = self.other.post(f"{self.url}enable/")
+        self.assertEqual(response.status_code, 403)
+
+    def test_owner_regenerate_issues_new_code(self):
+        old_code = self.qr.code
+        response = self.client.post(f"{self.url}regenerate/")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.data["code"], old_code)
+        self.assertEqual(response.data["entity_type"], "menu")
+        self.assertEqual(response.data["entity_id"], str(self.branch.id))
+        self.assertEqual(response.data["destination_type"], "menu")
+        self.assertTrue(response.data["url"].endswith(f"/qr/{response.data['code']}"))
+        self.assertEqual(APIClient().get(f"/qr/{old_code}/").status_code, 410)
+        public = APIClient().get(f"/qr/{response.data['code']}/")
+        self.assertEqual(public.status_code, 302)
+        self.assertTrue(public["Location"].endswith("/menu"))
+
+    def test_destination_endpoint_not_exposed(self):
+        response = self.client.patch(
+            f"{self.url}destination/",
+            {"destination_type": "branch"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+@override_settings(PUBLIC_SITE_URL="http://frontend.test")
+class ReservationQrManagementAPITests(TestCase):
+    def setUp(self):
+        self.owner, self.tenant = make_tenant()
+        self.branch = make_branch(self.tenant, name="Reservation QR Branch")
+        self.other_owner, _ = make_tenant()
+        self.qr = QrCode.objects.get(
+            entity_type=QrEntityType.RESERVATION,
+            entity_id=self.branch.id,
+            is_active=True,
+        )
+        self.client = _auth_client(self.owner)
+        self.other = _auth_client(self.other_owner)
+        self.url = f"/api/reservations/branches/{self.branch.id}/qr/"
+
+    def test_owner_retrieves_own_reservation_qr(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["code"], self.qr.code)
+        self.assertEqual(response.data["entity_type"], "reservation")
+        self.assertEqual(response.data["entity_id"], str(self.branch.id))
+        self.assertEqual(response.data["destination_type"], "reservation")
+
+    def test_other_owner_cannot_retrieve(self):
+        response = self.other.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_owner_can_disable(self):
+        response = self.client.post(f"{self.url}disable/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(APIClient().get(f"/qr/{self.qr.code}/").status_code, 410)
+
+    def test_owner_regenerate_preserves_reservation_entity(self):
+        old_code = self.qr.code
+        response = self.client.post(f"{self.url}regenerate/")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotEqual(response.data["code"], old_code)
+        self.assertEqual(response.data["entity_type"], "reservation")
+        self.assertEqual(response.data["destination_type"], "reservation")
+        public = APIClient().get(f"/qr/{response.data['code']}/")
+        self.assertEqual(public.status_code, 302)
+        self.assertTrue(public["Location"].endswith("/reservation"))
+
+    def test_unauthenticated_retrieve_rejected(self):
+        response = APIClient().get(self.url)
+        self.assertEqual(response.status_code, 401)
+
+
 class QrCodeAdminTests(TestCase):
     def test_qr_code_is_registered(self):
         self.assertIn(QrCode, admin.site._registry)

@@ -241,6 +241,10 @@ SPECTACULAR_SETTINGS = {
             "description": "public QR code resolution and redirect"},
         {"name": "Tenant - QR",
             "description": "authenticated tenant and branch QR management"},
+        {"name": "Menu - QR",
+            "description": "authenticated menu storefront QR management"},
+        {"name": "Reservations - QR",
+            "description": "authenticated reservation-page QR management"},
 
         {"name": "Access - Role",
             "description": "creating, updating, and managing system roles"},
