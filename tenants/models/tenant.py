@@ -70,15 +70,17 @@ class Tenant(WebPImageMixin, models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)],
         help_text="Service charge percentage applied to dine-in orders (e.g. 10 for 10%)",
     )
-    image = models.ImageField(upload_to="tenant_images/", null=True, blank=True)
+    image = models.ImageField(
+        upload_to="tenant_images/", null=True, blank=True, max_length=512,
+    )
     discover_avatar = models.ImageField(
-        upload_to="tenant_discover_avatars/", null=True, blank=True,
+        upload_to="tenant_discover_avatars/", null=True, blank=True, max_length=512,
     )
     discover_cover = models.ImageField(
-        upload_to="tenant_discover_covers/", null=True, blank=True,
+        upload_to="tenant_discover_covers/", null=True, blank=True, max_length=512,
     )
     hero_image = models.ImageField(
-        upload_to="tenant_heroes/", null=True, blank=True,
+        upload_to="tenant_heroes/", null=True, blank=True, max_length=512,
     )
     image_asset = models.ForeignKey(
         "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
@@ -197,9 +199,15 @@ class Branch(WebPImageMixin, models.Model):
     )
 
     # --- media ---
-    image = models.ImageField(upload_to="branch_images/", null=True, blank=True)
-    cover_image = models.ImageField(upload_to="branch_covers/", null=True, blank=True)
-    hero_image = models.ImageField(upload_to="branch_heroes/", null=True, blank=True)
+    image = models.ImageField(
+        upload_to="branch_images/", null=True, blank=True, max_length=512,
+    )
+    cover_image = models.ImageField(
+        upload_to="branch_covers/", null=True, blank=True, max_length=512,
+    )
+    hero_image = models.ImageField(
+        upload_to="branch_heroes/", null=True, blank=True, max_length=512,
+    )
     image_asset = models.ForeignKey(
         "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
     )

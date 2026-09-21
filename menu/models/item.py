@@ -63,6 +63,7 @@ class Tag(models.Model):
         upload_to=UniqueFilePath("menu_tags"),
         blank=True,
         null=True,
+        max_length=512,
         validators=[FileExtensionValidator(allowed_extensions=TAG_IMAGE_EXTENSIONS)],
     )
     image_asset = models.ForeignKey(
@@ -150,6 +151,7 @@ class MenuItem(WebPImageMixin, models.Model):
         upload_to=UniqueFilePath("menu_items"),
         blank=True,
         null=True,
+        max_length=512,
     )
     image_asset = models.ForeignKey(
         "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",

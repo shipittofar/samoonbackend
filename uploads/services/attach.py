@@ -83,9 +83,15 @@ def get_ready_asset(
         user=user,
         policy=policy,
         tenant_id=None if platform_asset else (tenant_id if policy.tenant_required else None),
-        branch_id=branch_id or resolve_branch_id(
-            entity_type=asset.entity_type,
-            entity_id=asset.entity_id,
+        # Never resolve/pass a branch for platform homepage assets.
+        branch_id=None
+        if platform_asset
+        else (
+            branch_id
+            or resolve_branch_id(
+                entity_type=asset.entity_type,
+                entity_id=asset.entity_id,
+            )
         ),
         entity_type=asset.entity_type,
         entity_id=asset.entity_id,

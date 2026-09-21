@@ -74,11 +74,21 @@ def is_platform_homepage_media(
     )
 
 
+def _is_platform_homepage_entity(*, entity_type: str = "", entity_id: str = "") -> bool:
+    return (
+        str(entity_type or "") == PLATFORM_HOMEPAGE_ENTITY_TYPE
+        and str(entity_id or "") == PLATFORM_HOMEPAGE_ENTITY_ID
+    )
+
+
 def resolve_branch_id(*, branch_id=None, entity_type: str = "", entity_id: str = ""):
     """Map upload entity metadata to a Branch id. Never treat a menu row UUID as a branch."""
     if branch_id:
         return branch_id
     if not entity_id:
+        return None
+    # Platform homepage is never a branch — do not resolve "homepage" as a Branch PK.
+    if str(entity_type or "") == PLATFORM_HOMEPAGE_ENTITY_TYPE:
         return None
     if entity_type == "branch":
         return entity_id
@@ -114,27 +124,26 @@ def assert_purpose_authorized(
             raise UploadValidationException("user_avatar must not include a tenant.")
         return None
 
-    # Platform homepage hero: website_media without tenant_id, only for
-    # entity_type=platform + entity_id=homepage, authorized as platform CMS.
-    if policy.purpose == "website_media" and is_platform_homepage_media(
-        purpose=policy.purpose,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        tenant_id=tenant_id,
-    ):
+    # Platform homepage markers must never fall through into tenant/branch authz.
+    # Wrong purpose (e.g. branch_logo/branch_hero) with platform/homepage used to hit
+    # branch_settings and raise "entity_id (branch) is required for this purpose."
+    if str(entity_type or "") == PLATFORM_HOMEPAGE_ENTITY_TYPE or str(
+        entity_id or ""
+    ) == PLATFORM_HOMEPAGE_ENTITY_ID:
+        if not _is_platform_homepage_entity(
+            entity_type=entity_type, entity_id=entity_id
+        ) or tenant_id not in (None, ""):
+            raise UploadValidationException(
+                "Platform homepage media requires entity_type=platform, "
+                "entity_id=homepage, purpose=website_media, and no tenant_id."
+            )
+        if policy.purpose != "website_media":
+            raise UploadValidationException(
+                "Platform homepage media requires purpose=website_media."
+            )
         if not user_can_platform_cms(user):
             _deny("Platform homepage media requires platform CMS privileges.")
         return None
-
-    if policy.purpose == "website_media" and (
-        str(entity_type or "") == PLATFORM_HOMEPAGE_ENTITY_TYPE
-        or str(entity_id or "") == PLATFORM_HOMEPAGE_ENTITY_ID
-    ):
-        # Reject ambiguous mixes (platform markers with tenant_id, or incomplete markers).
-        raise UploadValidationException(
-            "Platform homepage website_media requires entity_type=platform, "
-            "entity_id=homepage, and no tenant_id."
-        )
 
     if not tenant_id:
         raise UploadValidationException("tenant_id is required for this upload purpose.")

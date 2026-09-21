@@ -9,6 +9,10 @@ from uploads.api.serializers import (
     UploadInitiateResponseSerializer,
     UploadInitiateSerializer,
 )
+from uploads.authorization import (
+    PLATFORM_HOMEPAGE_ENTITY_ID,
+    PLATFORM_HOMEPAGE_ENTITY_TYPE,
+)
 from uploads.services.upload_bll import (
     cancel_upload,
     complete_upload,
@@ -17,9 +21,27 @@ from uploads.services.upload_bll import (
 )
 
 
-def _tenant_from_request(request, data_tenant_id=None):
+def _tenant_from_request(
+    request,
+    data_tenant_id=None,
+    *,
+    entity_type: str = "",
+    entity_id: str = "",
+):
+    """
+    Resolve tenant for initiate. Explicit body tenant_id wins.
+
+    Platform homepage markers (entity_type=platform, entity_id=homepage) must not
+    inherit an ambient console X-Tenant-Id header — that would collapse the
+    canonical platform context into a tenant-scoped upload.
+    """
     if data_tenant_id:
         return data_tenant_id
+    if (
+        str(entity_type or "") == PLATFORM_HOMEPAGE_ENTITY_TYPE
+        and str(entity_id or "") == PLATFORM_HOMEPAGE_ENTITY_ID
+    ):
+        return None
     header = request.headers.get("X-Tenant-Id") or request.META.get("HTTP_X_TENANT_ID")
     return header or None
 
@@ -47,6 +69,8 @@ class UploadInitiateAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         idempotency = data.get("idempotency_key") or request.headers.get("Idempotency-Key")
+        entity_type = data.get("entity_type") or ""
+        entity_id = data.get("entity_id") or ""
         asset, upload = initiate_upload(
             user=request.user,
             purpose=data["purpose"],
@@ -54,9 +78,14 @@ class UploadInitiateAPIView(APIView):
             mime_type=data["mime_type"],
             byte_size=data["byte_size"],
             checksum=data.get("checksum") or "",
-            tenant_id=_tenant_from_request(request, data.get("tenant_id")),
-            entity_type=data.get("entity_type") or "",
-            entity_id=data.get("entity_id") or "",
+            tenant_id=_tenant_from_request(
+                request,
+                data.get("tenant_id"),
+                entity_type=entity_type,
+                entity_id=entity_id,
+            ),
+            entity_type=entity_type,
+            entity_id=entity_id,
             branch_id=data.get("branch_id"),
             idempotency_key=idempotency or None,
         )

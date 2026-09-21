@@ -20,7 +20,7 @@ from core.exceptions.uploads import (
     UploadValidationException,
 )
 from uploads import object_store
-from uploads.authorization import assert_purpose_authorized, resolve_branch_id
+from uploads.authorization import assert_purpose_authorized, is_platform_homepage_media, resolve_branch_id
 from uploads.keys import original_storage_key, safe_extension, safe_original_filename
 from uploads.models import UploadAsset
 from uploads.processing import decode_image
@@ -108,11 +108,21 @@ def assert_actor_can_access_asset(asset: UploadAsset, user) -> None:
         if asset.created_by_id != user.id:
             raise UploadPermissionDeniedException()
         return
+    # Always re-authorize from the persisted asset context so platform homepage
+    # (tenant_id=null, entity_type=platform, entity_id=homepage) is not
+    # re-interpreted as a branch/tenant upload on complete/cancel/status.
     assert_purpose_authorized(
         user=user,
         policy=policy,
         tenant_id=asset.tenant_id,
-        branch_id=resolve_branch_id(
+        branch_id=None
+        if is_platform_homepage_media(
+            purpose=asset.purpose,
+            entity_type=asset.entity_type,
+            entity_id=asset.entity_id,
+            tenant_id=asset.tenant_id,
+        )
+        else resolve_branch_id(
             entity_type=asset.entity_type,
             entity_id=asset.entity_id,
         ),
@@ -261,9 +271,19 @@ def initiate_upload(
         stored_entity_type = stored_entity_type or "branch"
         stored_entity_id = str(resolved_branch_id)
 
+    platform_homepage = is_platform_homepage_media(
+        purpose=purpose,
+        entity_type=stored_entity_type,
+        entity_id=stored_entity_id,
+        tenant_id=tenant_id,
+    )
+    # Persist the canonical platform context (tenant null) so complete/ready/attach
+    # re-authorize from the same markers and never fall into branch_settings.
+    stored_tenant_id = None if platform_homepage else (tenant_id if policy.tenant_required else None)
+
     asset = UploadAsset(
         created_by=user,
-        tenant_id=tenant_id if policy.tenant_required else None,
+        tenant_id=stored_tenant_id,
         purpose=purpose,
         original_filename=safe_original_filename(filename),
         mime_type=mime_type,

@@ -18,7 +18,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     first_name = models.CharField(max_length=64, blank=True, null=True)
     last_name = models.CharField(max_length=64, blank=True, null=True)
-    avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
+    avatar = models.ImageField(upload_to="avatars/", blank=True, null=True, max_length=512)
     avatar_asset = models.ForeignKey(
         "uploads.UploadAsset",
         on_delete=models.SET_NULL,

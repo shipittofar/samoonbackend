@@ -76,7 +76,12 @@ class UploadApiTests(TestCase):
         return self.client.post("/api/uploads/initiate/", payload, format="json")
 
     def _put_object(self, asset, content=None):
-        save_bytes(asset.storage_key, SimpleUploadedFile("x.png", content or _png()))
+        blob = content or _png()
+        save_bytes(
+            asset.storage_key,
+            SimpleUploadedFile("x.png", blob, content_type=asset.mime_type),
+            content_type=asset.mime_type,
+        )
 
     def test_initiate_valid(self):
         response = self._initiate()
@@ -318,6 +323,7 @@ class MenuMutationAuthTests(TestCase):
         self.assertTrue(MenuItem.objects.filter(name="Burger").exists())
 
 
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
 class UploadProcessingAndStateTests(TestCase):
     def setUp(self):
         self.user, self.tenant, self.branch = make_tenant()
@@ -340,11 +346,11 @@ class UploadProcessingAndStateTests(TestCase):
             status=UploadAssetStatus.UPLOADED,
             expires_at=timezone.now() + timedelta(hours=24),
         )
-        save_bytes(asset.storage_key, ContentFile(blob))
+        save_bytes(asset.storage_key, ContentFile(blob), content_type="image/webp")
         variants = process_asset_image(asset, max_dimension=1600)
-        from django.core.files.storage import default_storage
+        from uploads.object_store import open_object
 
-        with default_storage.open(variants["optimized"], "rb") as fh:
+        with open_object(variants["optimized"]) as fh:
             with Image.open(fh) as img:
                 self.assertLessEqual(max(img.size), 1600)
 
@@ -368,7 +374,11 @@ class UploadProcessingAndStateTests(TestCase):
         }
         asset_id = client.post("/api/uploads/initiate/", payload, format="json").data["asset_id"]
         asset = UploadAsset.objects.get(pk=asset_id)
-        save_bytes(asset.storage_key, SimpleUploadedFile("x.png", _png()))
+        save_bytes(
+            asset.storage_key,
+            SimpleUploadedFile("x.png", _png(), content_type="image/png"),
+            content_type="image/png",
+        )
         client.post(f"/api/uploads/{asset_id}/complete/")
         other_user, other_tenant, _ = make_tenant()
         other_client = APIClient()
@@ -405,7 +415,12 @@ class UploadHardeningTests(TestCase):
         return self.client.post("/api/uploads/initiate/", payload, format="json")
 
     def _put(self, asset, content=None):
-        save_bytes(asset.storage_key, SimpleUploadedFile("x.png", content or _png()))
+        blob = content or _png()
+        save_bytes(
+            asset.storage_key,
+            SimpleUploadedFile("x.png", blob, content_type=asset.mime_type),
+            content_type=asset.mime_type,
+        )
 
     def test_unauthenticated_initiate_denied(self):
         self.client.force_authenticate(user=None)
@@ -593,7 +608,7 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
             format="json",
         )
         asset = UploadAsset.objects.get(pk=response.data["asset_id"])
-        save_bytes(asset.storage_key, SimpleUploadedFile("h.jpg", blob))
+        save_bytes(asset.storage_key, SimpleUploadedFile("h.jpg", blob), content_type="image/jpeg")
         complete = self.client.post(f"/api/uploads/{asset.id}/complete/")
         self.assertEqual(complete.status_code, status.HTTP_200_OK, complete.data)
         self.assertEqual(complete.data["status"], UploadAssetStatus.READY)
@@ -709,3 +724,130 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
             owner_client.get(f"/api/uploads/{asset_id}/").status_code,
             status.HTTP_403_FORBIDDEN,
         )
+
+    def test_branch_purpose_with_platform_entity_does_not_ask_for_branch(self):
+        """Regression: mis-routed branch_* + platform/homepage must not hit branch authz."""
+        self.client.force_authenticate(user=self.cms)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "branch_hero",
+                "filename": "hero.jpg",
+                "mime_type": "image/jpeg",
+                "byte_size": len(_png()),
+                "tenant_id": str(self.tenant.id),
+                "entity_type": "platform",
+                "entity_id": "homepage",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        detail = str(response.data)
+        self.assertNotIn("entity_id (branch) is required", detail)
+        self.assertTrue(
+            "website_media" in detail.lower() or "platform" in detail.lower()
+            or "error" in detail.lower()
+        )
+
+    def test_platform_full_lifecycle_to_ready_and_attach(self):
+        from uploads.services.attach import _mark, get_ready_asset
+
+        blob = self._jpeg_bytes()
+        self.client.force_authenticate(user=self.cms)
+        # Ambient console X-Tenant-Id must not collapse platform homepage context.
+        initiated = self.client.post(
+            "/api/uploads/initiate/",
+            self._platform_payload(byte_size=len(blob)),
+            format="json",
+            HTTP_X_TENANT_ID=str(self.tenant.id),
+        )
+        self.assertEqual(initiated.status_code, status.HTTP_201_CREATED, initiated.data)
+        asset_id = initiated.data["asset_id"]
+        asset = UploadAsset.objects.get(pk=asset_id)
+        self.assertIsNone(asset.tenant_id)
+        self.assertEqual(asset.entity_type, "platform")
+        self.assertEqual(asset.entity_id, "homepage")
+        save_bytes(
+            asset.storage_key,
+            SimpleUploadedFile("h.jpg", blob),
+            content_type="image/jpeg",
+        )
+
+        # Status/complete re-authorize from persisted platform context (not branch).
+        detail = self.client.get(f"/api/uploads/{asset_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK, detail.data)
+        complete = self.client.post(f"/api/uploads/{asset_id}/complete/")
+        self.assertEqual(complete.status_code, status.HTTP_200_OK, complete.data)
+        self.assertEqual(complete.data["status"], UploadAssetStatus.READY)
+        asset.refresh_from_db()
+        self.assertEqual(asset.entity_type, "platform")
+        self.assertEqual(asset.entity_id, "homepage")
+        self.assertIsNone(asset.tenant_id)
+        self.assertIn("optimized", asset.variant_keys or {})
+
+        ready = get_ready_asset(
+            asset_id=asset_id,
+            user=self.cms,
+            purpose="website_media",
+            tenant_id=None,
+        )
+        self.assertEqual(ready.status, UploadAssetStatus.READY)
+        _mark(
+            ready,
+            UploadAssetStatus.ATTACHED,
+            attached_to_type="platform.homepage",
+            attached_to_id="homepage",
+        )
+        ready.refresh_from_db()
+        self.assertEqual(ready.status, UploadAssetStatus.ATTACHED)
+
+        # Cannot reuse as branch media.
+        with self.assertRaises(Exception) as ctx:
+            get_ready_asset(
+                asset_id=asset_id,
+                user=self.cms,
+                purpose="branch_logo",
+                tenant_id=str(self.tenant.id),
+                branch_id=self.branch.id,
+            )
+        self.assertIn("purpose", str(ctx.exception).lower())
+
+        # Non-staff cannot attach.
+        with self.assertRaises(Exception):
+            get_ready_asset(
+                asset_id=asset_id,
+                user=self.owner,
+                purpose="website_media",
+                tenant_id=None,
+            )
+
+    def test_branch_media_still_requires_branch_entity(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "branch_hero",
+                "filename": "hero.jpg",
+                "mime_type": "image/jpeg",
+                "byte_size": len(_png()),
+                "tenant_id": str(self.tenant.id),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("entity_id (branch) is required", str(response.data))
+
+        ok = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "branch_hero",
+                "filename": "hero.jpg",
+                "mime_type": "image/jpeg",
+                "byte_size": len(_png()),
+                "tenant_id": str(self.tenant.id),
+                "entity_type": "branch",
+                "entity_id": str(self.branch.id),
+            },
+            format="json",
+        )
+        self.assertEqual(ok.status_code, status.HTTP_201_CREATED, ok.data)

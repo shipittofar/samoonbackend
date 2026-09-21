@@ -89,18 +89,55 @@ def head_object(key: str) -> dict | None:
 
 
 def open_object(key: str):
-    return default_storage.open(assert_safe_storage_key(key), "rb")
+    key = assert_safe_storage_key(key)
+    client, bucket = _s3_client()
+    if client is not None:
+        from io import BytesIO
+
+        try:
+            response = client.get_object(Bucket=bucket, Key=key)
+            return BytesIO(response["Body"].read())
+        except Exception:
+            logger.exception("Unable to open S3 object %s", key)
+            raise
+    return default_storage.open(key, "rb")
 
 
 def save_bytes(key: str, content, content_type: str | None = None):
+    """
+    Persist bytes at the canonical storage key.
+
+    When S3 is configured, write via put_object so ContentType matches what
+    complete_upload verifies via head_object. The content_type argument must be
+    honored — callers (ingest/processing) already pass it.
+    """
     key = assert_safe_storage_key(key)
-    if default_storage.exists(key):
-        default_storage.delete(key)
     if hasattr(content, "seek"):
         try:
             content.seek(0)
         except Exception:
             pass
+
+    resolved_type = content_type or getattr(content, "content_type", None) or ""
+    client, bucket = _s3_client()
+    if client is not None:
+        if hasattr(content, "read"):
+            body = content.read()
+            if hasattr(content, "seek"):
+                try:
+                    content.seek(0)
+                except Exception:
+                    pass
+        else:
+            body = content
+        params = {"Bucket": bucket, "Key": key, "Body": body}
+        if resolved_type:
+            params["ContentType"] = resolved_type
+        client.put_object(**params)
+        return key
+
+    if default_storage.exists(key):
+        default_storage.delete(key)
     if hasattr(default_storage, "_save"):
         return default_storage._save(key, content)
     return default_storage.save(key, content)
@@ -111,6 +148,12 @@ def delete_object(key: str) -> None:
         return
     try:
         key = assert_safe_storage_key(key)
+        client, bucket = _s3_client()
+        if client is not None:
+            try:
+                client.delete_object(Bucket=bucket, Key=key)
+            except Exception:
+                logger.exception("Failed to delete S3 object %s", key)
         if default_storage.exists(key):
             default_storage.delete(key)
     except Exception:
