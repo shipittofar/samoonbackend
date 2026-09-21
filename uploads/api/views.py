@@ -33,11 +33,13 @@ class UploadInitiateAPIView(APIView):
         responses={201: UploadInitiateResponseSerializer},
         summary="Create an upload intent and presigned PUT URL",
         description=(
-            "Creates a tenant-scoped UploadAsset and a short-lived S3-compatible PUT URL. "
+            "Creates an UploadAsset and a short-lived S3-compatible PUT URL. "
             "Object keys are server-generated. The browser must PUT bytes to `upload.url` "
             "with the returned Content-Type header, then call complete. "
-            "Purposes: user_avatar (self), tenant_* and website_media (settings.edit), "
-            "menu_* (menu.manage + branch). Idempotency-Key header or body field is per user."
+            "Purposes: user_avatar (self), tenant_* and tenant website_media (settings.edit), "
+            "website_media with entity_type=platform&entity_id=homepage (platform CMS staff, "
+            "no tenant_id), menu_* (menu.manage + branch). "
+            "Idempotency-Key header or body field is per user."
         ),
     )
     def post(self, request, *args, **kwargs):

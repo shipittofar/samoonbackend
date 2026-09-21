@@ -123,6 +123,9 @@ PURPOSE_REGISTRY: dict[str, PurposePolicy] = {
     ),
     "website_media": PurposePolicy(
         purpose="website_media",
+        # Tenant-scoped usage still requires tenant_id + settings.edit.
+        # Platform homepage exception: entity_type=platform, entity_id=homepage,
+        # no tenant_id, authorized as platform CMS (is_staff/is_superuser).
         tenant_required=True,
         permission_slug="settings.edit",
         authz="tenant_settings",

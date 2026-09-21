@@ -11,7 +11,11 @@ from core.exceptions.uploads import (
     UploadStateException,
     UploadValidationException,
 )
-from uploads.authorization import assert_purpose_authorized, resolve_branch_id
+from uploads.authorization import (
+    assert_purpose_authorized,
+    is_platform_homepage_media,
+    resolve_branch_id,
+)
 from uploads.models import UploadAsset
 from uploads.purposes import get_purpose
 from uploads.state import UploadAssetStatus, can_transition
@@ -69,10 +73,16 @@ def get_ready_asset(
     if asset.is_expired() and asset.status != UploadAssetStatus.ATTACHED:
         raise UploadStateException("Upload has expired.")
     policy = get_purpose(purpose)
+    platform_asset = is_platform_homepage_media(
+        purpose=asset.purpose,
+        entity_type=asset.entity_type,
+        entity_id=asset.entity_id,
+        tenant_id=asset.tenant_id,
+    )
     assert_purpose_authorized(
         user=user,
         policy=policy,
-        tenant_id=tenant_id if policy.tenant_required else None,
+        tenant_id=None if platform_asset else (tenant_id if policy.tenant_required else None),
         branch_id=branch_id or resolve_branch_id(
             entity_type=asset.entity_type,
             entity_id=asset.entity_id,
@@ -80,6 +90,12 @@ def get_ready_asset(
         entity_type=asset.entity_type,
         entity_id=asset.entity_id,
     )
+    if platform_asset:
+        if tenant_id not in (None, ""):
+            raise UploadPermissionDeniedException(
+                "Platform homepage media cannot be attached in a tenant context."
+            )
+        return asset
     if policy.tenant_required:
         if tenant_id is None or str(asset.tenant_id) != str(tenant_id):
             raise UploadPermissionDeniedException(

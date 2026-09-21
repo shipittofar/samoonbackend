@@ -535,3 +535,177 @@ class UploadHardeningTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+class PlatformHomepageWebsiteMediaTests(TestCase):
+    """website_media + entity_type=platform + entity_id=homepage (no tenant_id)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.owner, self.tenant, self.branch = make_tenant()
+        self.other, self.other_tenant, _ = make_tenant()
+        self.cms = make_user()
+        self.cms.is_staff = True
+        self.cms.save(update_fields=["is_staff"])
+
+    def _platform_payload(self, **overrides):
+        payload = {
+            "purpose": "website_media",
+            "filename": "hero.jpg",
+            "mime_type": "image/jpeg",
+            "byte_size": len(_png()),
+            "entity_type": "platform",
+            "entity_id": "homepage",
+        }
+        payload.update(overrides)
+        return payload
+
+    def _jpeg_bytes(self):
+        buf = io.BytesIO()
+        Image.new("RGB", (32, 32), (10, 20, 30)).save(buf, format="JPEG")
+        return buf.getvalue()
+
+    def test_platform_cms_can_initiate_without_tenant_id(self):
+        blob = self._jpeg_bytes()
+        self.client.force_authenticate(user=self.cms)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            self._platform_payload(
+                byte_size=len(blob), mime_type="image/jpeg", filename="hero.jpg"
+            ),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+        self.assertIsNone(asset.tenant_id)
+        self.assertEqual(asset.entity_type, "platform")
+        self.assertEqual(asset.entity_id, "homepage")
+        self.assertEqual(asset.purpose, "website_media")
+        self.assertTrue(asset.storage_key.startswith("users/"))
+
+    def test_platform_initiate_complete_ready(self):
+        blob = self._jpeg_bytes()
+        self.client.force_authenticate(user=self.cms)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            self._platform_payload(byte_size=len(blob)),
+            format="json",
+        )
+        asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+        save_bytes(asset.storage_key, SimpleUploadedFile("h.jpg", blob))
+        complete = self.client.post(f"/api/uploads/{asset.id}/complete/")
+        self.assertEqual(complete.status_code, status.HTTP_200_OK, complete.data)
+        self.assertEqual(complete.data["status"], UploadAssetStatus.READY)
+        asset.refresh_from_db()
+        self.assertIsNone(asset.tenant_id)
+
+    def test_non_staff_cannot_use_platform_exception(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            self._platform_payload(),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_tenant_website_media_still_requires_tenant_id(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "website_media",
+                "filename": "hero.png",
+                "mime_type": "image/png",
+                "byte_size": len(_png()),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_tenant_website_media_with_tenant_id_ok(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "website_media",
+                "filename": "hero.png",
+                "mime_type": "image/png",
+                "byte_size": len(_png()),
+                "tenant_id": str(self.tenant.id),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+        self.assertEqual(str(asset.tenant_id), str(self.tenant.id))
+
+    def test_cross_tenant_website_media_rejected(self):
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "website_media",
+                "filename": "hero.png",
+                "mime_type": "image/png",
+                "byte_size": len(_png()),
+                "tenant_id": str(self.other_tenant.id),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_platform_markers_with_tenant_id_rejected(self):
+        self.client.force_authenticate(user=self.cms)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            self._platform_payload(tenant_id=str(self.tenant.id)),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_incomplete_platform_markers_without_tenant_rejected(self):
+        self.client.force_authenticate(user=self.cms)
+        response = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "website_media",
+                "filename": "hero.png",
+                "mime_type": "image/png",
+                "byte_size": len(_png()),
+                "entity_type": "platform",
+                "entity_id": "other",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_other_staff_can_status_platform_asset(self):
+        blob = self._jpeg_bytes()
+        self.client.force_authenticate(user=self.cms)
+        asset_id = self.client.post(
+            "/api/uploads/initiate/",
+            self._platform_payload(byte_size=len(blob)),
+            format="json",
+        ).data["asset_id"]
+        other_cms = make_user()
+        other_cms.is_staff = True
+        other_cms.save(update_fields=["is_staff"])
+        other = APIClient()
+        other.force_authenticate(user=other_cms)
+        detail = other.get(f"/api/uploads/{asset_id}/")
+        self.assertEqual(detail.status_code, status.HTTP_200_OK)
+
+    def test_tenant_owner_cannot_read_platform_asset(self):
+        self.client.force_authenticate(user=self.cms)
+        asset_id = self.client.post(
+            "/api/uploads/initiate/",
+            self._platform_payload(),
+            format="json",
+        ).data["asset_id"]
+        owner_client = APIClient()
+        owner_client.force_authenticate(user=self.owner)
+        self.assertEqual(
+            owner_client.get(f"/api/uploads/{asset_id}/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
