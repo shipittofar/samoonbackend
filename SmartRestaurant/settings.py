@@ -18,6 +18,13 @@ from botocore.config import Config
 from corsheaders.defaults import default_headers
 
 
+def _csv_setting(env_name: str, defaults: list[str]) -> list[str]:
+    raw = os.getenv(env_name, "").strip()
+    if not raw:
+        return list(defaults)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
 load_dotenv()
 
 
@@ -34,44 +41,59 @@ SECRET_KEY = 'django-insecure-cw#zh!v^(#_h#+34dy%df*vd@z9usg&)zqrahv42+a#nax-_(t
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 # ALLOWED_HOSTS = ['localhost', '127.0.0.1']
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    '0,0,0,0',
-    '78.157.60.7',
-    '77.221.156.197',
-]
-CSRF_TRUSTED_ORIGINS = [
-    'http://78.157.60.7:8800',
-    'https://78.157.60.7:8800',
-    "http://77.221.156.197",
-    "http://77.221.156.197:3000",
+ALLOWED_HOSTS = _csv_setting(
+    "DJANGO_ALLOWED_HOSTS",
+    [
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0",
+        "78.157.60.7",
+        "77.221.156.197",
+    ],
+)
+
+# Next.js is served by samoon-nginx on :80 (and optionally :443), so the browser
+# Origin is http://78.157.60.7 / https://78.157.60.7 — not the API host/port.
+# The shipped frontend currently calls the API at :8000; nginx also exposes :8800.
+# Override with CORS_ALLOWED_ORIGINS / CSRF_TRUSTED_ORIGINS (comma-separated).
+# Never use * or CORS_ALLOW_ALL_ORIGINS with credentials.
+_DEFAULT_BROWSER_ORIGINS = [
     "http://78.157.60.7",
     "https://78.157.60.7",
+    "http://78.157.60.7:3000",
+    "https://78.157.60.7:3000",
+    "http://78.157.60.7:4000",
+    "http://78.157.60.7:8000",
+    "http://78.157.60.7:8800",
+    "https://78.157.60.7:8800",
+    "http://77.221.156.197",
+    "https://77.221.156.197",
+    "http://77.221.156.197:3000",
+    "http://77.221.156.197:8800",
     "http://45.149.76.125:3000",
     "http://localhost:3000",
     "http://localhost:4000",
     "http://localhost:8800",
-    "http://77.221.156.197:8800",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:4000",
+    "http://127.0.0.1:8800",
 ]
-CORS_ALLOWED_ORIGINS = [
-    'http://78.157.60.7:8800',
-    'https://78.157.60.7:8800',
-    "http://77.221.156.197",
-    "http://77.221.156.197:3000",
-    "http://78.157.60.7",
-    "http://78.157.60.7:3000",
-    "http://localhost:3000",
-    "http://localhost:4000",
-    "http://localhost:8800",
-    "http://77.221.156.197:8800",
-]
+CSRF_TRUSTED_ORIGINS = _csv_setting("CSRF_TRUSTED_ORIGINS", _DEFAULT_BROWSER_ORIGINS)
+CORS_ALLOWED_ORIGINS = _csv_setting("CORS_ALLOWED_ORIGINS", _DEFAULT_BROWSER_ORIGINS)
 CORS_ALLOW_CREDENTIALS = True
-# Browser clients (localhost:3000 → API) send tenant context on RBAC endpoints.
 CORS_ALLOW_HEADERS = (
     *default_headers,
     "x-tenant-slug",
     "x-tenant-id",
+    "idempotency-key",
+)
+CORS_ALLOW_METHODS = (
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
 )
 # Application definition
 
@@ -106,14 +128,15 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # First so 400/401/403/500 responses still receive ACAO for allowed origins.
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = 'SmartRestaurant.urls'
