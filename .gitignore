@@ -199,3 +199,5 @@ urls_FRONTEND.md
 mocktest.ts
 frontend_helper.md
 SmartRestaurant/backend.code-workspace
+celerybeat-schedule-shm
+celerybeat-schedule-wal
