@@ -108,3 +108,5 @@ class WebsiteMediaUploadSerializer(serializers.Serializer):
 
 class WebsiteMediaUploadResponseSerializer(serializers.Serializer):
     url = serializers.CharField()
+    asset_id = serializers.UUIDField(required=False)
+

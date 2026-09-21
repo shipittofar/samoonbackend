@@ -19,21 +19,17 @@ def process_image_to_webp(
     by the client are never written to storage; only the processed WebP
     version is persisted.
 
-    Idempotent: skips processing if the file is already a .webp, so
-    calling this on every model.save() does not reprocess unchanged images.
+    Always enforces max_dimension, including already-WebP uploads.
+    Skip only happens at the mixin layer for already-committed storage keys.
     """
     if not image_field or not image_field.name:
-        return
-
-    if image_field.name.lower().endswith(".webp"):
         return
 
     image_field.open()
     img = Image.open(image_field)
     img.load()  # force read before the underlying file handle is touched again
 
-    # Palette images (GIF, some PNGs) need conversion to preserve colors correctly.
-    # Anything else non-standard (CMYK, etc.) gets flattened to RGB.
+    # Always bound dimensions, including already-WebP uploads.
     if img.mode == "P":
         img = img.convert("RGBA")
     elif img.mode not in ("RGB", "RGBA"):

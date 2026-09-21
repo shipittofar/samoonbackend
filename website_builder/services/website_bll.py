@@ -3,7 +3,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from django.core.files.storage import default_storage
 from django.db import transaction
 
 from core.exceptions import BranchNotFoundException, TenantNotFoundException
@@ -50,8 +49,10 @@ class WebsiteBuilderBusinessLogicLayer:
 
     @staticmethod
     def get_layout(*, tenant_id: uuid.UUID) -> dict:
+        from uploads.services.media_json import resolve_media_tree
+
         layout = WebsiteBuilderBusinessLogicLayer._get_or_create_layout(tenant_id)
-        return build_layout_response(layout)
+        return resolve_media_tree(build_layout_response(layout))
 
     @staticmethod
     def _attach_tenant_branding(response: dict, tenant) -> dict:
@@ -71,6 +72,8 @@ class WebsiteBuilderBusinessLogicLayer:
 
     @staticmethod
     def get_public_website(*, tenant_id: uuid.UUID) -> dict:
+        from uploads.services.media_json import resolve_media_tree
+
         tenant = WebsiteBuilderBusinessLogicLayer._get_tenant_dto(tenant_id)
         if not tenant_is_publicly_listable(tenant):
             raise TenantNotFoundException()
@@ -84,12 +87,15 @@ class WebsiteBuilderBusinessLogicLayer:
                 branch_overrides=branch_overrides,
             )
         return WebsiteBuilderBusinessLogicLayer._attach_tenant_branding(
-            response, tenant
+            resolve_media_tree(response), tenant
         )
 
     @staticmethod
     @transaction.atomic
     def save_layout(*, tenant_id: uuid.UUID, layout_data: dict) -> dict:
+        from uploads.services.media_json import resolve_media_tree, sanitize_media_tree
+
+        layout_data = sanitize_media_tree(layout_data, tenant_id=tenant_id)
         layout = WebsiteBuilderBusinessLogicLayer._get_or_create_layout(tenant_id)
         saved_at = datetime.now(timezone.utc)
         layout = website_dal.save_layout(
@@ -97,7 +103,7 @@ class WebsiteBuilderBusinessLogicLayer:
             layout_data=layout_data,
             saved_at=saved_at,
         )
-        return build_layout_response(layout)
+        return resolve_media_tree(build_layout_response(layout))
 
     @staticmethod
     def get_branch_overrides(*, tenant_id: uuid.UUID, branch_id: uuid.UUID) -> dict:
@@ -110,32 +116,42 @@ class WebsiteBuilderBusinessLogicLayer:
         override = website_dal.get_branch_override(layout=layout, branch_id=branch_id)
         if override is None:
             return {}
-        return override.override_data or {}
+        from uploads.services.media_json import resolve_media_tree
+
+        return resolve_media_tree(override.override_data or {})
 
     @staticmethod
     @transaction.atomic
     def save_branch_overrides(
         *, tenant_id: uuid.UUID, branch_id: uuid.UUID, override_data: dict
     ) -> dict:
+        from uploads.services.media_json import resolve_media_tree, sanitize_media_tree
+
         tenant = WebsiteBuilderBusinessLogicLayer._get_tenant_for_write(tenant_id)
         branch = branch_dal.get_branch_for_update(branch_id)
         if not branch or branch.tenant_id != tenant.id:
             raise BranchNotFoundException()
 
         layout = WebsiteBuilderBusinessLogicLayer._get_or_create_layout(tenant_id)
+        override_data = sanitize_media_tree(override_data, tenant_id=tenant_id)
         override = website_dal.save_branch_override(
             layout=layout,
             branch=branch,
             override_data=override_data,
         )
-        return override.override_data or {}
+        return resolve_media_tree(override.override_data or {})
 
     @staticmethod
-    def upload_media(*, tenant_id: uuid.UUID, uploaded_file) -> str:
+    def upload_media(*, tenant_id: uuid.UUID, uploaded_file, user) -> dict:
+        from uploads.services.ingest import ingest_uploaded_file
+
         WebsiteBuilderBusinessLogicLayer._get_tenant_dto(tenant_id)
-        ext = uploaded_file.name.rsplit(".", 1)[-1] if "." in uploaded_file.name else "bin"
-        storage_path = default_storage.save(
-            f"website_media/{tenant_id}/{uuid.uuid4().hex}.{ext}",
-            uploaded_file,
+        asset = ingest_uploaded_file(
+            user=user,
+            uploaded_file=uploaded_file,
+            purpose="website_media",
+            tenant_id=tenant_id,
+            entity_type="tenant",
+            entity_id=str(tenant_id),
         )
-        return default_storage.url(storage_path)
+        return {"url": asset.public_url() or "", "asset_id": asset.id}

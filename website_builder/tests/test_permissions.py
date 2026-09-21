@@ -1,8 +1,10 @@
 """Permission coverage tests for Website Builder endpoints."""
+import io
 import copy
 import tempfile
 import uuid
 
+from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework import status
@@ -24,6 +26,7 @@ from website_builder.tests.test_website_builder import (
     LAYOUT_URL,
     MEDIA_URL,
     OVERRIDES_URL,
+    _png_bytes,
     make_branch,
     make_tenant_with_owner,
     make_user,
@@ -123,7 +126,7 @@ class WebsiteBuilderOwnerPermissionTests(TestCase):
     def test_owner_can_post_media(self):
         upload = SimpleUploadedFile(
             "hero.png",
-            b"\x89PNG\r\n\x1a\n",
+            _png_bytes(),
             content_type="image/png",
         )
         response = self.client.post(
@@ -152,28 +155,28 @@ class WebsiteBuilderStaffPermissionTests(TestCase):
         response = self.client.get(self.layout_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_staff_with_settings_view_can_put_layout(self):
+    def test_staff_with_settings_view_cannot_put_layout(self):
         response = self.client.put(
             self.layout_url,
             copy.deepcopy(FULL_LAYOUT_PAYLOAD),
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_staff_with_settings_view_can_get_overrides(self):
         response = self.client.get(self.overrides_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_staff_with_settings_view_can_put_overrides(self):
+    def test_staff_with_settings_view_cannot_put_overrides(self):
         response = self.client.put(
             self.overrides_url,
             copy.deepcopy(BRANCH_OVERRIDE_PAYLOAD),
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class WebsiteBuilderUnauthorizedPermissionTests(TestCase):
+class WebsiteBuilderUnauthorizedStaffTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.owner_user, self.tenant = make_tenant_with_owner()

@@ -65,6 +65,9 @@ class Tag(models.Model):
         null=True,
         validators=[FileExtensionValidator(allowed_extensions=TAG_IMAGE_EXTENSIONS)],
     )
+    image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
     color = models.CharField(
         max_length=7,
         blank=True,
@@ -147,6 +150,9 @@ class MenuItem(WebPImageMixin, models.Model):
         upload_to=UniqueFilePath("menu_items"),
         blank=True,
         null=True,
+    )
+    image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
     )
 
     calories = models.PositiveIntegerField(null=True, blank=True)

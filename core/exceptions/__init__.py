@@ -9,3 +9,4 @@ from .orders import *
 from .access import *
 from .favorite import *
 from .reservations import *
+from .uploads import *

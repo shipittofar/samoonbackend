@@ -1,7 +1,7 @@
 # apps/menu/api/views/categories.py
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.generics import (
     CreateAPIView,
     UpdateAPIView,
@@ -19,6 +19,7 @@ from menu.api.serializers.request import (
     MenuCategoryBulkCreateInputSerializer
 )
 from menu.api.serializers.response import MenuCategoryOutputSerializer
+from menu.authorization.branch_menu import RequireBranchMenuManagePermission
 from menu.services import CategoryBusinessLogicLayer
 from menu.models import MenuCategory
 from tenants.models import Branch
@@ -44,12 +45,14 @@ class CategoryPagination(PageNumberPagination):
 class MenuCategoryCreateView(CreateAPIView):
     serializer_class = MenuCategoryInputSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def create(self, request, *args, **kwargs):
         input_serializer = self.get_serializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
 
         category = category_bll.create_menu_category(
+            user=request.user,
             **input_serializer.validated_data
         )
 
@@ -63,6 +66,7 @@ class MenuCategoryCreateView(CreateAPIView):
 @extend_schema(tags=["Menu - Categories"], summary="Bulk create Menu Categories")
 class MenuCategoryBulkCreateView(CreateAPIView):
     serializer_class = MenuCategoryBulkCreateInputSerializer
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def create(self, request, *args, **kwargs):
         input_serializer = self.get_serializer(data=request.data)
@@ -89,6 +93,7 @@ class MenuCategoryBulkCreateView(CreateAPIView):
 class MenuCategoryUpdateView(UpdateAPIView):
     serializer_class = MenuCategoryUpdateSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     http_method_names = ["patch"]
 
     def patch(self, request, *args, **kwargs):
@@ -100,6 +105,8 @@ class MenuCategoryUpdateView(UpdateAPIView):
             branch_id=kwargs["branch_id"],
             **input_serializer.validated_data,
             image_provided="image" in request.data,
+            image_asset_id_provided="image_asset_id" in request.data,
+            user=request.user,
         )
 
         return Response(
@@ -139,6 +146,7 @@ class MenuCategoryDetailView(RetrieveAPIView):
     summary="Delete empty category (refuses if items exist)",
 )
 class MenuCategoryDeleteView(DestroyAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def destroy(self, request, *args, **kwargs):
         CategoryBusinessLogicLayer.delete_menu_category(

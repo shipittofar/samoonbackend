@@ -1,5 +1,7 @@
 import re
 
+from menu.authorization.branch_menu import assert_branch_menu_write
+from uploads.services.compat import apply_image_input
 from menu.models import Tag
 from menu.selectors import CategoryDataAccessLayer, TagDataAccessLayer
 from core.exceptions import (
@@ -59,12 +61,20 @@ class TagBusinessLogicLayer:
         description: str = "",
         icon: str = "",
         image=None,
+        image_asset_id=None,
         color: str = "",
         is_active: bool = True,
         display_order: int = 0,
+        user=None,
     ) -> Tag:
-        if not category_dal.branch_exists(branch_id):
+        if user is not None:
+            branch = assert_branch_menu_write(user, branch_id)
+        elif not category_dal.branch_exists(branch_id):
             raise BranchNotFoundException()
+            branch = None
+        else:
+            from tenants.models import Branch
+            branch = Branch.objects.filter(id=branch_id).first()
 
         TagBusinessLogicLayer._validate_color(color)
         TagBusinessLogicLayer._validate_icon(icon)
@@ -77,17 +87,39 @@ class TagBusinessLogicLayer:
         if slug and tag_dal.tag_exists(branch_id, slug=slug):
             raise TagAlreadyExistsException()
 
-        return tag_dal.create_tag(
+        tag = tag_dal.create_tag(
             branch_id=branch_id,
             name=name,
             slug=slug,
             description=description,
             icon=icon,
-            image=image,
+            image=None,
             color=color,
             is_active=is_active,
             display_order=display_order,
         )
+        if user is not None and (image is not None or image_asset_id is not None):
+            fields = apply_image_input(
+                instance=tag,
+                user=user,
+                image_field="image",
+                asset_fk="image_asset",
+                purpose="menu_tag",
+                tenant_id=getattr(branch, "tenant_id", None),
+                file=image,
+                file_provided=image is not None,
+                asset_id=image_asset_id,
+                asset_id_provided=image_asset_id is not None,
+                entity_type="menu_tag",
+                entity_id=str(tag.id),
+                branch_id=branch_id,
+            )
+            if fields:
+                tag.save(update_fields=list(dict.fromkeys(fields)))
+        elif image is not None:
+            tag.image = image
+            tag.save(update_fields=["image"])
+        return tag
 
     @staticmethod
     def update_tag(
@@ -100,9 +132,12 @@ class TagBusinessLogicLayer:
         icon: str | None = None,
         image=None,
         image_provided: bool = False,
+        image_asset_id=None,
+        image_asset_id_provided: bool = False,
         color: str | None = None,
         is_active: bool | None = None,
         display_order: int | None = None,
+        user=None,
     ) -> Tag:
         tag = tag_dal.get_tag_by_id(tag_id, branch_id)
         if tag is None:
@@ -123,6 +158,27 @@ class TagBusinessLogicLayer:
             branch_id, slug=slug, exclude_id=tag_id
         ):
             raise TagAlreadyExistsException()
+
+        if user is not None and (image_provided or image_asset_id_provided):
+            from tenants.models import Branch
+            branch = Branch.objects.filter(id=branch_id).first()
+            apply_image_input(
+                instance=tag,
+                user=user,
+                image_field="image",
+                asset_fk="image_asset",
+                purpose="menu_tag",
+                tenant_id=getattr(branch, "tenant_id", None),
+                file=image,
+                file_provided=image_provided,
+                asset_id=image_asset_id,
+                asset_id_provided=image_asset_id_provided,
+                entity_type="menu_tag",
+                entity_id=str(tag.id),
+                branch_id=branch_id,
+            )
+            image_provided = False
+            image = None
 
         return tag_dal.update_tag(
             tag=tag,

@@ -9,6 +9,7 @@ class MenuCategoryInputSerializer(serializers.Serializer):
         max_length=1000, required=False, allow_blank=True, default=""
     )
     image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     sort_order = serializers.IntegerField(default=0, min_value=0)
 
 
@@ -18,6 +19,7 @@ class MenuCategoryUpdateSerializer(serializers.Serializer):
         max_length=1000, required=False, allow_blank=True
     )
     image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     sort_order = serializers.IntegerField(min_value=0, required=False)
 
 

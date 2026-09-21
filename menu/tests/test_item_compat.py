@@ -72,6 +72,7 @@ class MenuItemCompatResponseTests(TestCase):
         self.branch = make_branch()
         self.category = make_category(self.branch)
         self.item = make_item(self.branch, self.category)
+        self.client.force_authenticate(user=self.branch.tenant.owner.user)
 
     def test_list_response_exposes_independent_available_and_is_active(self):
         self.item.available = False
@@ -253,6 +254,7 @@ class MenuItemVisibilityTests(TestCase):
         self.assertTrue(response.data["is_active"])
 
     def test_console_can_reactivate_inactive_item_via_is_active(self):
+        self.client.force_authenticate(user=self.branch.tenant.owner.user)
         response = self.client.patch(
             f"/api/menu/items/{self.inactive_item.id}/?branch_id={self.branch.id}",
             {"is_active": True},

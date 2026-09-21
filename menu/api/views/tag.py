@@ -76,6 +76,7 @@ class BranchTagListCreateView(APIView):
 
         tag = tag_bll.create_tag(
             branch_id=kwargs["branch_id"],
+            user=request.user,
             **input_serializer.validated_data,
         )
 
@@ -113,6 +114,8 @@ class BranchTagDetailView(APIView):
             branch_id=kwargs["branch_id"],
             **input_serializer.validated_data,
             image_provided="image" in request.data,
+            image_asset_id_provided="image_asset_id" in request.data,
+            user=request.user,
         )
 
         return Response(

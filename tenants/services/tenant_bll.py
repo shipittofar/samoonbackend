@@ -30,6 +30,71 @@ from core.exceptions import (
 )
 
 
+from uploads.services.compat import apply_image_input
+
+TENANT_MEDIA = (
+    ("image", "image_asset", "tenant_logo", "image_asset_id"),
+    ("discover_avatar", "discover_avatar_asset", "tenant_discover_avatar", "discover_avatar_asset_id"),
+    ("discover_cover", "discover_cover_asset", "tenant_discover_cover", "discover_cover_asset_id"),
+    ("hero_image", "hero_image_asset", "tenant_hero", "hero_image_asset_id"),
+)
+
+BRANCH_MEDIA = (
+    ("image", "image_asset", "branch_logo", "image_asset_id"),
+    ("cover_image", "cover_image_asset", "branch_cover", "cover_image_asset_id"),
+    ("hero_image", "hero_image_asset", "branch_hero", "hero_image_asset_id"),
+)
+
+
+def _extract_media(data: dict, bindings):
+    extracted = []
+    for file_key, fk, purpose, asset_key in bindings:
+        has_file = file_key in data
+        has_asset = asset_key in data
+        file = data.pop(file_key) if has_file else None
+        asset_id = data.pop(asset_key) if has_asset else None
+        # ImageField(allow_null=True) may appear as None alongside an asset id;
+        # treat that as asset-id-only rather than a conflicting dual input.
+        if has_file and has_asset and file is None:
+            has_file = False
+        extracted.append({
+            "file_key": file_key,
+            "fk": fk,
+            "purpose": purpose,
+            "file_provided": has_file,
+            "file": file,
+            "asset_id_provided": has_asset,
+            "asset_id": asset_id,
+        })
+    return extracted
+
+
+def _apply_extracted_media(instance, user, tenant_id, extracted, *, ingest_legacy: bool, entity_type: str, branch_id=None):
+    changed = []
+    for item in extracted:
+        if not item["file_provided"] and not item["asset_id_provided"]:
+            continue
+        changed.extend(
+            apply_image_input(
+                instance=instance,
+                user=user,
+                image_field=item["file_key"],
+                asset_fk=item["fk"],
+                purpose=item["purpose"],
+                tenant_id=tenant_id,
+                file=item["file"],
+                file_provided=item["file_provided"],
+                asset_id=item["asset_id"],
+                asset_id_provided=item["asset_id_provided"],
+                entity_type=entity_type,
+                entity_id=str(getattr(instance, "pk", "") or ""),
+                branch_id=branch_id,
+                ingest_legacy=ingest_legacy,
+            )
+        )
+    return changed
+
+
 tenant_dal = TenantDataAccessLayer()
 branch_dal = BranchDataAccessLayer()
 owner_dal = OwnerDataAccessLayer()
@@ -58,11 +123,18 @@ class TenantBusinessLogicLayer:
         data["owner"] = owner
         # Branch lifecycle: new tenants start inactive until the first branch exists.
         data["status"] = initial_tenant_status()
+        media = _extract_media(data, TENANT_MEDIA)
 
         try:
             tenant = Tenant.objects.create(**data)
         except IntegrityError:
             raise DuplicateTenantException()
+
+        media_fields = _apply_extracted_media(
+            tenant, user, tenant.id, media, ingest_legacy=True, entity_type="tenant",
+        )
+        if media_fields:
+            tenant.save(update_fields=list(dict.fromkeys(media_fields + ["updated_at"])))
 
         transaction.on_commit(
             lambda: tenant_dal.invalidate_tenant_cache(
@@ -127,21 +199,14 @@ class TenantBusinessLogicLayer:
         if "description" in data:
             update_fields.append("description")
 
-        if data.get("image") is not None:
-            tenant.image = data["image"]
-            update_fields.append("image")
-        if data.get("discover_avatar") is not None:
-            tenant.discover_avatar = data["discover_avatar"]
-            update_fields.append("discover_avatar")
-        if data.get("discover_cover") is not None:
-            tenant.discover_cover = data["discover_cover"]
-            update_fields.append("discover_cover")
-        if data.get("hero_image") is not None:
-            tenant.hero_image = data["hero_image"]
-            update_fields.append("hero_image")
+        media = _extract_media(data, TENANT_MEDIA)
+        media_fields = _apply_extracted_media(
+            tenant, user, tenant.id, media, ingest_legacy=True, entity_type="tenant",
+        )
+        update_fields.extend(media_fields)
 
         try:
-            tenant.save(update_fields=update_fields)
+            tenant.save(update_fields=list(dict.fromkeys(update_fields)))
         except IntegrityError:
             raise DuplicateTenantException()
 
@@ -324,9 +389,21 @@ class BranchBusinessLogicLayer:
         working_hours_data = data.pop("working_hours", [])
         settings_data = data.pop("settings", None)
         data["settings"] = _merge_extension_settings(None, settings_data)
+        media = _extract_media(data, BRANCH_MEDIA)
 
         had_lifecycle_branches = lifecycle_branches_exist(tenant.id)
         branch = Branch.objects.create(tenant_id=tenant.id, **data)
+        media_fields = _apply_extracted_media(
+            branch,
+            user,
+            tenant.id,
+            media,
+            ingest_legacy=False,
+            entity_type="branch",
+            branch_id=branch.id,
+        )
+        if media_fields:
+            branch.save(update_fields=list(dict.fromkeys(media_fields + ["updated_at"])))
         BranchBusinessLogicLayer._sync_working_hours(
             branch, working_hours_data)
 
@@ -358,6 +435,7 @@ class BranchBusinessLogicLayer:
 
         working_hours_data = data.pop("working_hours", None)
         settings_data = data.pop("settings", None)
+        media = _extract_media(data, BRANCH_MEDIA)
 
         branch.name = name
         branch.type = data.get("type", branch.type)
@@ -374,12 +452,15 @@ class BranchBusinessLogicLayer:
         branch.latitude = data.get("latitude")
         branch.longitude = data.get("longitude")
 
-        if "image" in data:
-            branch.image = data["image"]
-        if "cover_image" in data:
-            branch.cover_image = data["cover_image"]
-        if "hero_image" in data:
-            branch.hero_image = data["hero_image"]
+        media_fields = _apply_extracted_media(
+            branch,
+            user,
+            branch.tenant_id,
+            media,
+            ingest_legacy=False,
+            entity_type="branch",
+            branch_id=branch.id,
+        )
 
         branch.time_zone = data.get("time_zone", "UTC")
         branch.currency = data.get("currency", "USD")
@@ -407,7 +488,7 @@ class BranchBusinessLogicLayer:
             "status", "is_active", "is_default",
             "cuisines", "amenities",
             "updated_at",
-        ] + checkout_updates
+        ] + checkout_updates + media_fields
 
         branch.save(update_fields=list(dict.fromkeys(update_fields)))
 
@@ -479,23 +560,27 @@ class BranchBusinessLogicLayer:
         checkout_updates = _apply_branch_checkout_fields(branch, data)
         update_fields.extend(checkout_updates)
 
-        if image_provided:
-            if branch.image:
-                branch.image.delete(save=False)
-            branch.image = data.get("image")
-            update_fields.append("image")
-
-        if cover_image_provided:
-            if branch.cover_image:
-                branch.cover_image.delete(save=False)
-            branch.cover_image = data.get("cover_image")
-            update_fields.append("cover_image")
-
-        if hero_image_provided:
-            if branch.hero_image:
-                branch.hero_image.delete(save=False)
-            branch.hero_image = data.get("hero_image")
-            update_fields.append("hero_image")
+        provided_flags = {
+            "image": image_provided,
+            "cover_image": cover_image_provided,
+            "hero_image": hero_image_provided,
+        }
+        media = _extract_media(data, BRANCH_MEDIA)
+        for item in media:
+            if provided_flags.get(item["file_key"]):
+                item["file_provided"] = True
+                if item["file"] is None:
+                    item["file"] = None
+        media_fields = _apply_extracted_media(
+            branch,
+            user,
+            tenant_id,
+            media,
+            ingest_legacy=False,
+            entity_type="branch",
+            branch_id=branch.id,
+        )
+        update_fields.extend(media_fields)
 
         if "settings" in data:
             branch.settings = _merge_extension_settings(

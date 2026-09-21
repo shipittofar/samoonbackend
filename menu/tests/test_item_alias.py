@@ -185,6 +185,7 @@ class MenuItemDetailAliasViewTests(TestCase):
         self.branch = make_branch()
         self.category = make_category(self.branch)
         self.item = make_item(self.branch, self.category, name="Burger")
+        self.client.force_authenticate(user=self.branch.tenant.owner.user)
 
     def _item_url(self, item_id):
         return f"/api/menu/items/{item_id}/?branch_id={self.branch.id}"
@@ -214,6 +215,7 @@ class MenuItemDetailAliasViewTests(TestCase):
         other_branch = make_branch()
         other_category = make_category(other_branch)
         other_item = make_item(other_branch, other_category, name="Other")
+        self.client.force_authenticate(user=other_branch.tenant.owner.user)
 
         post_response = self.client.post(
             f"/api/menu/items/{other_item.id}/?branch_id={other_branch.id}",

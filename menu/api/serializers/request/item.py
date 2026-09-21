@@ -12,6 +12,7 @@ class MenuItemInputSerializer(serializers.Serializer):
         max_digits=5, decimal_places=2, default=0, min_value=0
     )
     image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     calories = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     preparation_time = serializers.IntegerField(
         required=False, allow_null=True, min_value=0
@@ -33,6 +34,7 @@ class MenuItemUpdateSerializer(serializers.Serializer):
         max_digits=5, decimal_places=2, required=False, min_value=0
     )
     image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     calories = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     preparation_time = serializers.IntegerField(
         required=False, allow_null=True, min_value=0

@@ -15,6 +15,7 @@ class TagInputSerializer(serializers.Serializer):
         max_length=16, required=False, allow_blank=True, default=""
     )
     image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     color = serializers.CharField(
         max_length=7, required=False, allow_blank=True, default=""
     )
@@ -42,6 +43,7 @@ class TagUpdateSerializer(serializers.Serializer):
     )
     icon = serializers.CharField(max_length=16, required=False, allow_blank=True)
     image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     color = serializers.CharField(max_length=7, required=False, allow_blank=True)
     is_active = serializers.BooleanField(required=False)
     display_order = serializers.IntegerField(min_value=0, required=False)

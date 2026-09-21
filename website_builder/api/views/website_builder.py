@@ -18,7 +18,13 @@ website_bll = WebsiteBuilderBusinessLogicLayer()
 
 
 class WebsiteBuilderPermissionMixin:
-    permission_classes = (IsAuthenticated, RequirePermission("settings.view"))
+    def get_permissions(self):
+        method = getattr(self.request, "method", None)
+        if method == "GET":
+            if self.__class__.__name__ == "WebsiteLayoutAPIView":
+                return [AllowAny()]
+            return [IsAuthenticated(), RequirePermission("settings.view")()]
+        return [IsAuthenticated(), RequirePermission("settings.edit")()]
 
 
 @extend_schema_view(
@@ -104,10 +110,13 @@ class WebsiteMediaUploadAPIView(WebsiteBuilderPermissionMixin, APIView):
     def post(self, request, tenant_id, *args, **kwargs):
         serializer = WebsiteMediaUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        url = website_bll.upload_media(
+        payload = website_bll.upload_media(
             tenant_id=tenant_id,
             uploaded_file=serializer.validated_data["file"],
+            user=request.user,
         )
-        if request and not str(url).startswith(("http://", "https://")):
+        url = payload.get("url") or ""
+        if request and url and not str(url).startswith(("http://", "https://")):
             url = request.build_absolute_uri(url)
-        return Response({"url": url}, status=status.HTTP_201_CREATED)
+            payload["url"] = url
+        return Response(payload, status=status.HTTP_201_CREATED)

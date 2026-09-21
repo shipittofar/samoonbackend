@@ -1,6 +1,7 @@
 # menu/services/item_bll.py
 from django.db import transaction
 
+from menu.authorization.branch_menu import assert_branch_menu_write
 from menu.models import Extra, MenuItemExtra, MenuItem
 from menu.selectors import (
     ItemDataAccessLayer,
@@ -10,6 +11,7 @@ from menu.selectors import (
     ExtraGroupDataAccessLayer,
 )
 from menu.selectors.extra_group_dal import MenuItemExtraGroupDataAccessLayer
+from uploads.services.compat import apply_image_input
 from core.exceptions import (
     CategoryNotFoundException,
     MenuItemAlreadyExistsException,
@@ -42,6 +44,7 @@ class ItemBusinessLogicLayer:
         description: str = "",
         discount: float = 0,
         image=None,
+        image_asset_id=None,
         calories: int | None = None,
         preparation_time: int | None = None,
         is_active: bool = True,
@@ -49,9 +52,12 @@ class ItemBusinessLogicLayer:
         is_popular: bool = False,
         is_featured: bool = False,
         tag_ids: list | None = None,
+        user=None,
     ) -> MenuItem:
 
-        if not category_dal.branch_exists(branch_id):
+        if user is not None:
+            assert_branch_menu_write(user, branch_id)
+        elif not category_dal.branch_exists(branch_id):
             raise BranchNotFoundException()
 
         if not item_dal.category_exists(category_id, branch_id):
@@ -65,14 +71,14 @@ class ItemBusinessLogicLayer:
             if missing_tags:
                 raise TagNotFoundException()
 
-        return item_dal.create_item(
+        item = item_dal.create_item(
             branch_id=branch_id,
             category_id=category_id,
             name=name,
             price=price,
             description=description,
             discount=discount,
-            image=image,
+            image=None,
             calories=calories,
             preparation_time=preparation_time,
             is_active=is_active,
@@ -81,6 +87,32 @@ class ItemBusinessLogicLayer:
             is_featured=is_featured,
             tag_ids=tag_ids,
         )
+        if user is not None and (image is not None or image_asset_id is not None):
+            from tenants.models import Branch
+
+            branch = Branch.objects.filter(id=branch_id).first()
+            fields = apply_image_input(
+                instance=item,
+                user=user,
+                image_field="image",
+                asset_fk="image_asset",
+                purpose="menu_item",
+                tenant_id=getattr(branch, "tenant_id", None),
+                file=image,
+                file_provided=image is not None,
+                asset_id=image_asset_id,
+                asset_id_provided=image_asset_id is not None,
+                entity_type="menu_item",
+                entity_id=str(item.id),
+                branch_id=branch_id,
+                ingest_legacy=True,
+            )
+            if fields:
+                item.save(update_fields=list(dict.fromkeys(fields)))
+        elif image is not None:
+            item.image = image
+            item.save(update_fields=["image"])
+        return item
 
     @staticmethod
     @transaction.atomic
@@ -155,7 +187,13 @@ class ItemBusinessLogicLayer:
         tag_ids_provided: bool = False,
         extra_group_ids: list | None = None,
         extra_group_ids_provided: bool = False,
+        image_asset_id=None,
+        image_asset_id_provided: bool = False,
+        user=None,
     ) -> MenuItem:
+
+        if user is not None:
+            assert_branch_menu_write(user, branch_id)
 
         item = item_dal.get_item_by_id_and_context(
             item_id=item_id,
@@ -176,6 +214,29 @@ class ItemBusinessLogicLayer:
             missing_tags = item_dal.get_missing_tag_ids(set(tag_ids), branch_id)
             if missing_tags:
                 raise TagNotFoundException()
+
+        if user is not None and (image_provided or image_asset_id_provided):
+            from tenants.models import Branch
+
+            branch = Branch.objects.filter(id=branch_id).first()
+            apply_image_input(
+                instance=item,
+                user=user,
+                image_field="image",
+                asset_fk="image_asset",
+                purpose="menu_item",
+                tenant_id=getattr(branch, "tenant_id", None),
+                file=image,
+                file_provided=image_provided,
+                asset_id=image_asset_id,
+                asset_id_provided=image_asset_id_provided,
+                entity_type="menu_item",
+                entity_id=str(item.id),
+                branch_id=branch_id,
+                ingest_legacy=True,
+            )
+            image_provided = False
+            image = None
 
         updated_item = item_dal.update_item(
             item=item,

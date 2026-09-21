@@ -503,7 +503,14 @@ class SetAvatarView(UpdateAPIView):
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = profile_bll.set_avatar(request.user, serializer.validated_data["avatar"])
+        data = serializer.validated_data
+        user = profile_bll.set_avatar(
+            request.user,
+            avatar=data.get("avatar"),
+            avatar_asset_id=data.get("avatar_asset_id"),
+            avatar_provided="avatar" in data,
+            avatar_asset_id_provided="avatar_asset_id" in data,
+        )
         return Response(
             UserOutputSerializer(user, context={"request": request}).data,
             status=status.HTTP_200_OK,

@@ -102,6 +102,7 @@ INSTALLED_APPS = [
     'access.apps.AccessConfig',
     'seeders.apps.SeedersConfig',
     'website_builder.apps.WebsiteBuilderConfig',
+    'uploads.apps.UploadsConfig',
 ]
 
 MIDDLEWARE = [
@@ -275,6 +276,8 @@ SPECTACULAR_SETTINGS = {
             "description": "updating or deleting the authenticated user's profile"},
         {"name": "Accounts - avatar",
             "description": "setting or removing the authenticated user's avatar"},
+        {"name": "Uploads",
+            "description": "direct-to-storage upload intents, completion, and asset status"},
     ],
 }
 # -------------------------------------------------------------------
@@ -346,6 +349,12 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
+CELERY_BEAT_SCHEDULE = {
+    "expire-orphan-uploads": {
+        "task": "uploads.tasks.expire_orphan_uploads",
+        "schedule": 3600.0,
+    },
+}
 
 # -- Local (Redis on localhost, if running; otherwise comment these out too) --
 # CELERY_BROKER_URL = "redis://localhost:6379/0"
@@ -390,7 +399,7 @@ AWS_STORAGE_BUCKET_NAME = os.getenv("ARVAN_BUCKET_NAME")
 AWS_S3_ENDPOINT_URL = "https://samoon.s3.ir-thr-at1.arvanstorage.ir"
 AWS_S3_REGION_NAME = "default"
 AWS_DEFAULT_ACL = "public-read"
-AWS_S3_FILE_OVERWRITE = True
+AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_AUTH = False
 AWS_S3_CLIENT_CONFIG = Config(
     connect_timeout=5,
@@ -408,6 +417,22 @@ STORAGES = {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
+
+# Direct-to-object-storage uploads (Arvan S3-compatible).
+# Browser PUT requires bucket CORS for the frontend origin, for example:
+#   AllowedOrigins: CORS_ALLOWED_ORIGINS
+#   AllowedMethods: PUT, GET, HEAD
+#   AllowedHeaders: Content-Type, Authorization
+#   ExposeHeaders: ETag
+# Originals use UUID keys under tenants/{id}/assets/{asset_id}/.
+# Storefront currently still reads public object URLs (AWS_DEFAULT_ACL=public-read).
+# Treat that as an explicit storefront policy, not an accidental default.
+# Do not put ARVAN_* secrets in frontend code.
+UPLOADS_DIRECT = os.getenv("UPLOADS_DIRECT", "true").lower() in ("1", "true", "yes")
+UPLOADS_INTENT_TTL_HOURS = int(os.getenv("UPLOADS_INTENT_TTL_HOURS", "24"))
+UPLOADS_PRESIGN_EXPIRES = int(os.getenv("UPLOADS_PRESIGN_EXPIRES", "900"))
+UPLOADS_MAX_OPEN_INTENTS_PER_USER = int(os.getenv("UPLOADS_MAX_OPEN_INTENTS_PER_USER", "20"))
+
 
 # seeder settings
 SEED_ADMIN_PHONE_NUMBER = os.getenv(

@@ -57,6 +57,10 @@ class TenantCreateSerializer(serializers.Serializer):
     discover_avatar = serializers.ImageField(required=False, allow_null=True)
     discover_cover = serializers.ImageField(required=False, allow_null=True)
     hero_image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    discover_avatar_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    discover_cover_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    hero_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
 
     business_types = BusinessTypesField(required=False, default=list)
     status = serializers.ChoiceField(
@@ -241,6 +245,9 @@ class BranchConsoleCreateSerializer(serializers.Serializer):
     heroImage = serializers.ImageField(
         required=False, allow_null=True, source="hero_image",
     )
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    cover_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    hero_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate_businessHours(self, value):
         days = [entry["day"] for entry in value]
@@ -387,6 +394,9 @@ class BranchCreateSerializer(serializers.Serializer):
     image = serializers.ImageField(required=False, allow_null=True)
     cover_image = serializers.ImageField(required=False, allow_null=True)
     hero_image = serializers.ImageField(required=False, allow_null=True)
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    cover_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    hero_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
 
     # --- locale ---
     time_zone = serializers.CharField(required=False, allow_blank=True, max_length=64, default="UTC")
@@ -491,6 +501,9 @@ class BranchConsoleUpdateSerializer(BranchConsoleCreateSerializer):
     heroImage = serializers.ImageField(
         required=False, allow_null=True, source="hero_image",
     )
+    image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    cover_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    hero_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
 
     _JSON_STRING_FIELDS = (
         "settings", "businessHours", "location", "contact", "metadata", "checkout",

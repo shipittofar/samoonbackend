@@ -1,7 +1,9 @@
 from django.db import transaction
 
+from menu.authorization.branch_menu import assert_branch_menu_write
 from menu.models import MenuCategory
 from menu.selectors import CategoryDataAccessLayer
+from uploads.services.compat import apply_image_input
 from core.exceptions import (
     CategoryAlreadyExistsException,
     BranchNotFoundException,
@@ -20,22 +22,52 @@ class CategoryBusinessLogicLayer:
         name: str,
         description: str = "",
         image=None,
+        image_asset_id=None,
         sort_order: int = 0,
+        user=None,
     ) -> MenuCategory:
 
-        if not category_dal.branch_exists(branch_id):
+        if user is not None:
+            branch = assert_branch_menu_write(user, branch_id)
+        elif not category_dal.branch_exists(branch_id):
             raise BranchNotFoundException()
+            branch = None
+        else:
+            from tenants.models import Branch
+            branch = Branch.objects.filter(id=branch_id).first()
 
         if category_dal.category_exists(branch_id, name):
             raise CategoryAlreadyExistsException()
 
-        return category_dal.create_category(
+        category = category_dal.create_category(
             branch_id=branch_id,
             name=name,
             description=description,
-            image=image,
+            image=None,
             sort_order=sort_order,
         )
+        if user is not None and (image is not None or image_asset_id is not None):
+            fields = apply_image_input(
+                instance=category,
+                user=user,
+                image_field="image",
+                asset_fk="image_asset",
+                purpose="menu_category",
+                tenant_id=getattr(branch, "tenant_id", None),
+                file=image,
+                file_provided=image is not None,
+                asset_id=image_asset_id,
+                asset_id_provided=image_asset_id is not None,
+                entity_type="menu_category",
+                entity_id=str(category.id),
+                branch_id=branch_id,
+            )
+            if fields:
+                category.save(update_fields=list(dict.fromkeys(fields)))
+        elif image is not None:
+            category.image = image
+            category.save(update_fields=["image"])
+        return category
 
     @staticmethod
     @transaction.atomic
@@ -68,7 +100,10 @@ class CategoryBusinessLogicLayer:
         description: str | None = None,
         image=None,
         image_provided: bool = False,
+        image_asset_id=None,
+        image_asset_id_provided: bool = False,
         sort_order: int | None = None,
+        user=None,
     ) -> MenuCategory:
         category = category_dal.get_menu_category_by_id(
             category_id=category_id, branch_id=branch_id)
@@ -81,6 +116,27 @@ class CategoryBusinessLogicLayer:
                 exclude_id=category_id,
         ):
             raise CategoryAlreadyExistsException()
+
+        if user is not None:
+            branch = assert_branch_menu_write(user, branch_id)
+            if image_provided or image_asset_id_provided:
+                apply_image_input(
+                    instance=category,
+                    user=user,
+                    image_field="image",
+                    asset_fk="image_asset",
+                    purpose="menu_category",
+                    tenant_id=branch.tenant_id,
+                    file=image,
+                    file_provided=image_provided,
+                    asset_id=image_asset_id,
+                    asset_id_provided=image_asset_id_provided,
+                    entity_type="menu_category",
+                    entity_id=str(category.id),
+                    branch_id=branch_id,
+                )
+                image_provided = False
+                image = None
 
         return category_dal.update_category(
             category=category,

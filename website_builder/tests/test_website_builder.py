@@ -1,8 +1,10 @@
 """API tests for Website Builder Phase 1 endpoints."""
+import io
 import copy
 import tempfile
 import uuid
 
+from PIL import Image
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework import status
@@ -17,6 +19,12 @@ from website_builder.models import BranchWebsiteOverride, WebsiteLayout
 LAYOUT_URL = "/api/tenants/{tenant_id}/website/layout/"
 OVERRIDES_URL = "/api/tenants/{tenant_id}/branches/{branch_id}/website/overrides/"
 MEDIA_URL = "/api/tenants/{tenant_id}/website/media/"
+
+
+def _png_bytes():
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(buffer, format="PNG")
+    return buffer.getvalue()
 
 FULL_LAYOUT_PAYLOAD = {
     "sections": DEFAULT_SECTIONS,
@@ -259,7 +267,7 @@ class WebsiteBuilderMediaUploadAPITests(TestCase):
     def test_media_upload_returns_url_only(self):
         upload = SimpleUploadedFile(
             "hero.png",
-            b"\x89PNG\r\n\x1a\n",
+            _png_bytes(),
             content_type="image/png",
         )
         response = self.client.post(
@@ -269,7 +277,7 @@ class WebsiteBuilderMediaUploadAPITests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        self.assertEqual(set(response.data.keys()), {"url"})
+        self.assertIn("url", response.data)
         self.assertTrue(response.data["url"])
 
     def test_default_layout_matches_frontend_defaults(self):

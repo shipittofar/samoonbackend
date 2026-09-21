@@ -80,6 +80,18 @@ class Tenant(WebPImageMixin, models.Model):
     hero_image = models.ImageField(
         upload_to="tenant_heroes/", null=True, blank=True,
     )
+    image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    discover_avatar_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    discover_cover_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    hero_image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
     business_types = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=20, choices=TenantStatus.choices, default=TenantStatus.INACTIVE)
     is_active = models.BooleanField(
@@ -188,6 +200,15 @@ class Branch(WebPImageMixin, models.Model):
     image = models.ImageField(upload_to="branch_images/", null=True, blank=True)
     cover_image = models.ImageField(upload_to="branch_covers/", null=True, blank=True)
     hero_image = models.ImageField(upload_to="branch_heroes/", null=True, blank=True)
+    image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    cover_image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    hero_image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
 
     # --- locale ---
     time_zone = models.CharField(max_length=64, blank=True, default="UTC")

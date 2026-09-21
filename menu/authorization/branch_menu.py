@@ -24,6 +24,14 @@ class RequireBranchMenuManagePermission(BasePermission):
         branch_id = view.kwargs.get(self.branch_lookup_kwarg)
         if branch_id is None:
             branch_id = request.query_params.get("branch_id")
+        if branch_id is None and hasattr(request, "data"):
+            branch_id = request.data.get("branch_id")
+            if branch_id is None:
+                items = request.data.get("items") or request.data.get("categories") or []
+                if isinstance(items, list) and items:
+                    first = items[0]
+                    if hasattr(first, "get"):
+                        branch_id = first.get("branch_id")
         if branch_id is None:
             return False
 
@@ -54,3 +62,28 @@ class RequireBranchMenuManagePermission(BasePermission):
             )
 
         return True
+
+
+def assert_branch_menu_write(user, branch_id) -> Branch:
+    if not user or not getattr(user, "is_authenticated", False):
+        raise PermissionDeniedException(
+            "You do not have the required permission(s): 'menu.manage'."
+        )
+    branch = Branch.objects.filter(id=branch_id).select_related("tenant").first()
+    if branch is None:
+        raise BranchNotFoundException()
+    if TenantOwnerChecker().is_owner(user=user, tenant_id=branch.tenant_id):
+        return branch
+    if branch.manager_id == user.id:
+        return branch
+    has_perm = permission_selector.user_has_permissions(
+        user_id=user.id,
+        tenant_id=branch.tenant_id,
+        branch_id=branch.id,
+        permission_slugs=("menu.manage",),
+    )
+    if not has_perm:
+        raise PermissionDeniedException(
+            "You do not have the required permission(s): 'menu.manage'."
+        )
+    return branch

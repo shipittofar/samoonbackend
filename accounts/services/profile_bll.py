@@ -1,6 +1,7 @@
 from django.utils import timezone
 from accounts.models import User
 from core.exceptions.account import AvatarNotSetException, AccountAlreadyDeletedException
+from uploads.services.compat import apply_image_input
 
 
 class ProfileBusinessLogicLayer:
@@ -20,20 +21,55 @@ class ProfileBusinessLogicLayer:
         return user
 
     @classmethod
-    def set_avatar(cls, user: User, avatar) -> User:
-        if user.avatar:
-            user.avatar.delete(save=False)
-        user.avatar = avatar
-        user.save(update_fields=["avatar"])
+    def set_avatar(
+        cls,
+        user: User,
+        avatar=None,
+        avatar_asset_id=None,
+        avatar_provided: bool = False,
+        avatar_asset_id_provided: bool = False,
+    ) -> User:
+        if not avatar_provided and not avatar_asset_id_provided:
+            avatar_provided = avatar is not None
+            avatar_asset_id_provided = avatar_asset_id is not None
+        fields = apply_image_input(
+            instance=user,
+            user=user,
+            image_field="avatar",
+            asset_fk="avatar_asset",
+            purpose="user_avatar",
+            tenant_id=None,
+            file=avatar,
+            file_provided=avatar_provided,
+            asset_id=avatar_asset_id,
+            asset_id_provided=avatar_asset_id_provided,
+            entity_type="user",
+            entity_id=str(user.id),
+            ingest_legacy=True,
+        )
+        if fields:
+            user.save(update_fields=list(dict.fromkeys(fields)))
         return user
 
     @classmethod
     def delete_avatar(cls, user: User) -> User:
-        if not user.avatar:
+        if not user.avatar and not user.avatar_asset_id:
             raise AvatarNotSetException()
-        user.avatar.delete(save=False)
-        user.avatar = None
-        user.save(update_fields=["avatar"])
+        fields = apply_image_input(
+            instance=user,
+            user=user,
+            image_field="avatar",
+            asset_fk="avatar_asset",
+            purpose="user_avatar",
+            file=None,
+            file_provided=True,
+            asset_id=None,
+            asset_id_provided=False,
+            entity_type="user",
+            entity_id=str(user.id),
+            ingest_legacy=True,
+        )
+        user.save(update_fields=list(dict.fromkeys(fields or ["avatar", "avatar_asset"])))
         return user
 
     @classmethod

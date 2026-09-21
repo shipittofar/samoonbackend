@@ -19,6 +19,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=64, blank=True, null=True)
     last_name = models.CharField(max_length=64, blank=True, null=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
+    avatar_asset = models.ForeignKey(
+        "uploads.UploadAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
 
     role = models.CharField(max_length=16, choices=UserRole.choices, default=UserRole.CUSTOMER)
     is_verified = models.BooleanField(default=False)

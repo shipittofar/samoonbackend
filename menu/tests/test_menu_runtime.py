@@ -75,9 +75,8 @@ class MenuCategoryIsolationTests(TestCase):
             {"branch_id": str(branch.id), "name": "Drinks"},
             format="json",
         )
-        # Create view currently has no permission_classes (AllowAny).
-        # Pin current behavior; storefront write auth is a separate hardening item.
-        self.assertIn(response.status_code, (201, 401, 403), response.data)
+        # Mutation endpoints require authentication and menu.manage / owner.
+        self.assertIn(response.status_code, (401, 403), response.data)
 
     def test_member_without_permission_cannot_list_console_categories(self):
         _, tenant, branch = make_tenant_with_owner()

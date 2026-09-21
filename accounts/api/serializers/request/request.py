@@ -117,7 +117,17 @@ class UpdateProfileInputSerializer(serializers.Serializer):
 
 
 class SetAvatarInputSerializer(serializers.Serializer):
-    avatar = serializers.ImageField()
+    avatar = serializers.ImageField(required=False)
+    avatar_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if "avatar" in attrs and "avatar_asset_id" in attrs:
+            raise serializers.ValidationError(
+                "Provide either avatar or avatar_asset_id, not both."
+            )
+        if "avatar" not in attrs and "avatar_asset_id" not in attrs:
+            raise serializers.ValidationError("avatar or avatar_asset_id is required.")
+        return attrs
 
 
 class ForgetPasswordRequestInputSerializer(serializers.Serializer):

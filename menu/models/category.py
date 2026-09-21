@@ -30,6 +30,9 @@ class MenuCategory(WebPImageMixin, models.Model):
         blank=True,
         null=True,
     )
+    image_asset = models.ForeignKey(
+        "uploads.UploadAsset", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
 
     sort_order = models.PositiveIntegerField(
         default=0

@@ -11,8 +11,9 @@ from rest_framework.generics import (
     DestroyAPIView
 )
 from rest_framework.views import APIView
-from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
+from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 
 from menu.api.serializers.request.menu import (
@@ -38,6 +39,7 @@ from menu.services.item_bll import (
     MenuItemExtraGroupBusinessLogicLayer,
 )
 from menu.services.menu_bll import MenuBusinessLogicLayer
+from menu.authorization.branch_menu import RequireBranchMenuManagePermission
 from menu.api.views.tenant_summary import (
     MenuPublicTenantSummaryMixin,
     tenant_summary_for_branch,
@@ -162,8 +164,10 @@ def _perform_menu_item_partial_update(request, *, item_id, category_id, branch_i
         branch_id=branch_id,
         **input_serializer.validated_data,
         image_provided="image" in request.data,
+        image_asset_id_provided="image_asset_id" in request.data,
         tag_ids_provided="tag_ids" in request.data,
         extra_group_ids_provided="extra_group_ids" in request.data,
+        user=request.user,
     )
 
     return Response(
@@ -192,12 +196,14 @@ class ExtraPagination(PageNumberPagination):
 class MenuItemCreateView(CreateAPIView):
     serializer_class = MenuItemInputSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def create(self, request, *args, **kwargs):
         input_serializer = self.get_serializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
 
         item = item_bll.create_menu_item(
+            user=request.user,
             **input_serializer.validated_data
         )
 
@@ -215,12 +221,14 @@ class MenuItemCreateView(CreateAPIView):
 class ConsoleMenuItemCreateView(CreateAPIView):
     serializer_class = MenuItemInputSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def create(self, request, *args, **kwargs):
         input_serializer = self.get_serializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
 
         item = item_bll.create_menu_item(
+            user=request.user,
             **input_serializer.validated_data
         )
 
@@ -233,6 +241,7 @@ class ConsoleMenuItemCreateView(CreateAPIView):
 @extend_schema(tags=["Menu - Items"], summary="Bulk create Menu Items")
 class MenuItemBulkCreateView(CreateAPIView):
     serializer_class = MenuItemBulkCreateInputSerializer
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def create(self, request, *args, **kwargs):
         input_serializer = self.get_serializer(data=request.data)
@@ -270,6 +279,7 @@ class ConsoleMenuItemListView(ListAPIView):
 class MenuItemUpdateView(UpdateAPIView):
     serializer_class = MenuItemUpdateSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     http_method_names = ["patch", "put"]
 
     def partial_update(self, request, *args, **kwargs):
@@ -332,6 +342,11 @@ class MenuItemAliasListView(MenuPublicTenantSummaryMixin, ListAPIView):
 class MenuItemCollectionAliasView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [AllowAny()]
+        return [IsAuthenticated(), RequireBranchMenuManagePermission()]
+
     def get(self, request, *args, **kwargs):
         branch_id = _resolve_branch_id(request, kwargs)
         if _request_uses_item_filters(request):
@@ -355,7 +370,7 @@ class MenuItemCollectionAliasView(APIView):
     def post(self, request, *args, **kwargs):
         input_serializer = MenuItemInputSerializer(data=request.data)
         input_serializer.is_valid(raise_exception=True)
-        item = item_bll.create_menu_item(**input_serializer.validated_data)
+        item = item_bll.create_menu_item(**input_serializer.validated_data, user=request.user)
         return Response(
             _serialize_menu_item(_reload_menu_item_for_response(item)),
             status=status.HTTP_201_CREATED,
@@ -449,6 +464,11 @@ class MenuItemRelatedAliasView(APIView):
 class MenuItemDetailAliasView(APIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [AllowAny()]
+        return [IsAuthenticated(), RequireBranchMenuManagePermission()]
+
     def _get_item(self, request, kwargs):
         branch_id = _resolve_branch_id(request, kwargs)
         item = (
@@ -522,6 +542,7 @@ class MenuItemDetailView(RetrieveAPIView):
 
 @extend_schema(tags=["Menu - Items"], summary="Soft-delete menu item (sets deleted_at)")
 class MenuItemDeleteView(DestroyAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def destroy(self, request, *args, **kwargs):
         ItemBusinessLogicLayer.delete_menu_item(
