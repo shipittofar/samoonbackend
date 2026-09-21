@@ -46,11 +46,9 @@ def sanitize_media_value(value, *, tenant_id, allow_legacy_urls: bool = True):
             parsed = UUID(str(asset_id))
         except (TypeError, ValueError) as exc:
             raise UploadValidationException("asset_id must be a UUID.") from exc
-        asset = UploadAsset.objects.filter(id=parsed).first()
+        asset = UploadAsset.objects.filter(id=parsed, tenant_id=tenant_id).first()
         if asset is None:
             raise UploadValidationException("Unknown media asset_id.")
-        if str(asset.tenant_id) != str(tenant_id):
-            raise UploadValidationException("Media asset does not belong to this tenant.")
         if asset.purpose != "website_media":
             raise UploadValidationException("Media asset purpose must be website_media.")
         if asset.status not in {
@@ -59,6 +57,10 @@ def sanitize_media_value(value, *, tenant_id, allow_legacy_urls: bool = True):
         }:
             raise UploadValidationException("Media asset is not READY.")
         if asset.status == UploadAssetStatus.READY:
+            from uploads.state import can_transition
+
+            if not can_transition(asset.status, UploadAssetStatus.ATTACHED):
+                raise UploadValidationException("Media asset cannot be attached.")
             asset.status = UploadAssetStatus.ATTACHED
             asset.attached_to_type = "website_builder.WebsiteLayout"
             asset.save(update_fields=["status", "attached_to_type", "updated_at"])

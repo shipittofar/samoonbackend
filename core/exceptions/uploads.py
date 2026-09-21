@@ -35,3 +35,9 @@ class UploadObjectMissingException(BaseAppException):
     status_code = 400
     code = "upload_object_missing"
     message = "Uploaded object was not found in storage."
+
+
+class UploadExpiredException(BaseAppException):
+    status_code = 409
+    code = "upload_expired"
+    message = "This upload intent has expired."

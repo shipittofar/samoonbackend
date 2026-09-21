@@ -26,6 +26,7 @@ ALLOWED_TRANSITIONS = {
     UploadAssetStatus.PROCESSING: {
         UploadAssetStatus.READY,
         UploadAssetStatus.FAILED,
+        UploadAssetStatus.EXPIRED,
     },
     UploadAssetStatus.READY: {
         UploadAssetStatus.ATTACHED,
@@ -54,6 +55,7 @@ IDEMPOTENT_COMPLETE_STATUSES = {
 UNATTACHED_EXPIRE_STATUSES = {
     UploadAssetStatus.INITIATED,
     UploadAssetStatus.UPLOADED,
+    UploadAssetStatus.PROCESSING,
     UploadAssetStatus.READY,
 }
 

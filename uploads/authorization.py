@@ -38,6 +38,32 @@ def user_can_menu_manage(user, branch: Branch) -> bool:
     )
 
 
+def resolve_branch_id(*, branch_id=None, entity_type: str = "", entity_id: str = ""):
+    """Map upload entity metadata to a Branch id. Never treat a menu row UUID as a branch."""
+    if branch_id:
+        return branch_id
+    if not entity_id:
+        return None
+    if entity_type == "branch":
+        return entity_id
+    if entity_type == "menu_item":
+        from menu.models import MenuItem
+
+        row = MenuItem.objects.filter(pk=entity_id).only("branch_id").first()
+        return getattr(row, "branch_id", None)
+    if entity_type == "menu_category":
+        from menu.models import MenuCategory
+
+        row = MenuCategory.objects.filter(pk=entity_id).only("branch_id").first()
+        return getattr(row, "branch_id", None)
+    if entity_type == "menu_tag":
+        from menu.models import Tag
+
+        row = Tag.objects.filter(pk=entity_id).only("branch_id").first()
+        return getattr(row, "branch_id", None)
+    return None
+
+
 def assert_purpose_authorized(
     *,
     user,
@@ -66,10 +92,14 @@ def assert_purpose_authorized(
             _deny()
         return tenant
 
+    resolved_branch_id = resolve_branch_id(
+        branch_id=branch_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
     branch = None
-    if branch_id or entity_type == "branch":
-        lookup_id = branch_id or entity_id
-        branch = Branch.objects.filter(id=lookup_id).select_related("tenant").first()
+    if resolved_branch_id:
+        branch = Branch.objects.filter(id=resolved_branch_id).select_related("tenant").first()
         if branch is None or str(branch.tenant_id) != str(tenant.id):
             from core.exceptions import BranchNotFoundException
 
@@ -86,7 +116,7 @@ def assert_purpose_authorized(
 
     if policy.authz == "menu":
         if branch is None:
-            raise UploadValidationException("entity_id (branch) is required for menu uploads.")
+            raise UploadValidationException("branch_id is required for menu uploads.")
         if not user_can_menu_manage(user, branch):
             _deny()
         return branch

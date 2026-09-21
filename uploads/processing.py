@@ -12,16 +12,38 @@ from uploads.purposes import MEDIUM_MAX, THUMBNAIL_MAX, WEBP_QUALITY
 
 logger = logging.getLogger(__name__)
 
+# Bound pathological images (decompression bombs) below Pillow's default.
+MAX_IMAGE_PIXELS = 20_000_000
+
 VARIANT_SPECS = (
     ("thumbnail", THUMBNAIL_MAX),
     ("medium", MEDIUM_MAX),
     ("optimized", None),
 )
 
+_FORMAT_TO_MIME = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+    "GIF": "image/gif",
+}
 
-def decode_image(file_obj) -> Image.Image:
-    img = Image.open(file_obj)
-    img.load()
+
+def decode_image(file_obj, *, expected_mime: str | None = None) -> Image.Image:
+    previous = Image.MAX_IMAGE_PIXELS
+    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+    try:
+        img = Image.open(file_obj)
+        img.load()
+    except Image.DecompressionBombError as exc:
+        raise ValueError("Image exceeds maximum pixel count.") from exc
+    finally:
+        Image.MAX_IMAGE_PIXELS = previous
+
+    actual_mime = _FORMAT_TO_MIME.get((img.format or "").upper())
+    if expected_mime and actual_mime and actual_mime != expected_mime:
+        raise ValueError("Decoded image format does not match the declared MIME type.")
+
     if img.mode == "P":
         img = img.convert("RGBA")
     elif img.mode not in ("RGB", "RGBA"):
@@ -39,7 +61,7 @@ def _to_webp_bytes(img: Image.Image, *, max_dimension: int) -> bytes:
 
 def process_asset_image(asset, *, max_dimension: int) -> dict:
     with open_object(asset.storage_key) as fh:
-        img = decode_image(fh)
+        img = decode_image(fh, expected_mime=asset.mime_type)
 
     variants = {}
     for name, cap in VARIANT_SPECS:

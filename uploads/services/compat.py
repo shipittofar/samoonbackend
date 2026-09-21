@@ -33,7 +33,11 @@ def apply_image_input(
     omitted = unchanged (empty list)
     null asset or null file = detach
     asset_id = attach
-    legacy file = ingest into upload domain when ingest_legacy else assign FileField
+    legacy file = ingest into UploadAsset when ingest_legacy else assign FileField.
+
+    Branch create/edit uses ingest_legacy=False so ImageField + WebPImageMixin
+    remains the documented legacy multipart path. That path must not become a
+    second UploadAsset pipeline.
     """
     reject_conflicting_file_and_asset(file_provided, asset_id_provided)
     if not file_provided and not asset_id_provided:
@@ -49,6 +53,7 @@ def apply_image_input(
             purpose=purpose,
             tenant_id=tenant_id,
             attached_to_type=entity_type,
+            branch_id=branch_id,
         )
 
     if file is None:
@@ -61,6 +66,7 @@ def apply_image_input(
             purpose=purpose,
             tenant_id=tenant_id,
             attached_to_type=entity_type,
+            branch_id=branch_id,
         )
 
     if ingest_legacy and uploads_direct_enabled():
@@ -82,6 +88,7 @@ def apply_image_input(
             purpose=purpose,
             tenant_id=tenant_id,
             attached_to_type=entity_type,
+            branch_id=branch_id,
         )
 
     previous = getattr(instance, asset_fk, None)

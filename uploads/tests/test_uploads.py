@@ -383,3 +383,155 @@ class UploadProcessingAndStateTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+class UploadHardeningTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user, self.tenant, self.branch = make_tenant()
+        self.other, self.other_tenant, self.other_branch = make_tenant()
+        self.client.force_authenticate(user=self.user)
+
+    def _initiate(self, **overrides):
+        payload = {
+            "purpose": "tenant_logo",
+            "filename": "logo.png",
+            "mime_type": "image/png",
+            "byte_size": len(_png()),
+            "tenant_id": str(self.tenant.id),
+        }
+        payload.update(overrides)
+        return self.client.post("/api/uploads/initiate/", payload, format="json")
+
+    def _put(self, asset, content=None):
+        save_bytes(asset.storage_key, SimpleUploadedFile("x.png", content or _png()))
+
+    def test_unauthenticated_initiate_denied(self):
+        self.client.force_authenticate(user=None)
+        response = self._initiate()
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_cross_tenant_get_complete_cancel_denied(self):
+        asset_id = self._initiate().data["asset_id"]
+        other = APIClient()
+        other.force_authenticate(user=self.other)
+        self.assertEqual(other.get(f"/api/uploads/{asset_id}/").status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            other.post(f"/api/uploads/{asset_id}/complete/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(
+            other.post(f"/api/uploads/{asset_id}/cancel/").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_complete_ignores_uploaded_flag_and_requires_object(self):
+        asset_id = self._initiate().data["asset_id"]
+        response = self.client.post(
+            f"/api/uploads/{asset_id}/complete/",
+            {"uploaded": True, "storage_key": "tenants/other/assets/x/original"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_idempotent_initiate_does_not_reissue_after_ready(self):
+        first = self._initiate(idempotency_key="same-key")
+        asset = UploadAsset.objects.get(pk=first.data["asset_id"])
+        self._put(asset)
+        complete = self.client.post(f"/api/uploads/{asset.id}/complete/")
+        self.assertEqual(complete.status_code, status.HTTP_200_OK, complete.data)
+        second = self._initiate(idempotency_key="same-key")
+        self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
+
+    def test_cancel_processing_expires(self):
+        asset_id = self._initiate().data["asset_id"]
+        asset = UploadAsset.objects.get(pk=asset_id)
+        asset.status = UploadAssetStatus.PROCESSING
+        asset.save(update_fields=["status"])
+        cancel = self.client.post(f"/api/uploads/{asset_id}/cancel/")
+        self.assertEqual(cancel.status_code, status.HTTP_200_OK, cancel.data)
+        self.assertEqual(cancel.data["status"], UploadAssetStatus.EXPIRED)
+
+    def test_mime_spoof_rejected(self):
+        jpeg_name = {
+            "purpose": "tenant_logo",
+            "filename": "logo.jpg",
+            "mime_type": "image/jpeg",
+            "byte_size": len(_png()),
+            "tenant_id": str(self.tenant.id),
+        }
+        response = self.client.post("/api/uploads/initiate/", jpeg_name, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+        self._put(asset, _png())
+        complete = self.client.post(f"/api/uploads/{asset.id}/complete/")
+        self.assertEqual(complete.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_checksum_mismatch(self):
+        blob = _png()
+        response = self._initiate(checksum="0" * 64, byte_size=len(blob))
+        asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+        self._put(asset, blob)
+        complete = self.client.post(f"/api/uploads/{asset.id}/complete/")
+        self.assertEqual(complete.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_menu_initiate_requires_branch(self):
+        response = self._initiate(purpose="menu_item")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_menu_initiate_with_branch(self):
+        response = self._initiate(
+            purpose="menu_item",
+            branch_id=str(self.branch.id),
+            tenant_id=str(self.tenant.id),
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_storage_key_rejects_traversal(self):
+        from uploads.keys import assert_safe_storage_key
+
+        with self.assertRaises(ValueError):
+            assert_safe_storage_key("../secrets")
+        with self.assertRaises(ValueError):
+            assert_safe_storage_key("/etc/passwd")
+
+    def test_process_task_idempotent(self):
+        from uploads.tasks import process_upload_asset
+
+        asset_id = self._initiate().data["asset_id"]
+        asset = UploadAsset.objects.get(pk=asset_id)
+        self._put(asset)
+        self.client.post(f"/api/uploads/{asset_id}/complete/")
+        asset.refresh_from_db()
+        variants = dict(asset.variant_keys)
+        process_upload_asset(str(asset.id))
+        asset.refresh_from_db()
+        self.assertEqual(asset.status, UploadAssetStatus.READY)
+        self.assertEqual(asset.variant_keys, variants)
+
+    def test_avatar_cannot_attach_to_tenant(self):
+        av = self.client.post(
+            "/api/uploads/initiate/",
+            {
+                "purpose": "user_avatar",
+                "filename": "me.png",
+                "mime_type": "image/png",
+                "byte_size": len(_png()),
+            },
+            format="json",
+        )
+        self.assertEqual(av.status_code, status.HTTP_201_CREATED, av.data)
+        asset = UploadAsset.objects.get(pk=av.data["asset_id"])
+        self._put(asset)
+        self.client.post(f"/api/uploads/{asset.id}/complete/")
+        response = self.client.patch(
+            f"/api/tenants/{self.tenant.id}/update/",
+            {
+                "name": self.tenant.name,
+                "status": self.tenant.status,
+                "image_asset_id": str(asset.id),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

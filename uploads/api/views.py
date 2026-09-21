@@ -2,7 +2,7 @@ from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, inline_serializer
 
 from uploads.api.serializers import (
     UploadAssetSerializer,
@@ -32,6 +32,13 @@ class UploadInitiateAPIView(APIView):
         request=UploadInitiateSerializer,
         responses={201: UploadInitiateResponseSerializer},
         summary="Create an upload intent and presigned PUT URL",
+        description=(
+            "Creates a tenant-scoped UploadAsset and a short-lived S3-compatible PUT URL. "
+            "Object keys are server-generated. The browser must PUT bytes to `upload.url` "
+            "with the returned Content-Type header, then call complete. "
+            "Purposes: user_avatar (self), tenant_* and website_media (settings.edit), "
+            "menu_* (menu.manage + branch). Idempotency-Key header or body field is per user."
+        ),
     )
     def post(self, request, *args, **kwargs):
         serializer = UploadInitiateSerializer(data=request.data)
@@ -61,10 +68,17 @@ class UploadCompleteAPIView(APIView):
 
     @extend_schema(
         tags=["Uploads"],
+        request=inline_serializer("UploadCompleteRequest", fields={}),
         responses={200: UploadAssetSerializer},
         summary="Verify stored object and enqueue processing",
+        description=(
+            "Ignores any client `uploaded` flag. The server HEADs the object at the "
+            "asset storage key, checks size/MIME, decodes images, and optionally "
+            "compares a SHA-256 checksum. Processing is asynchronous (Celery)."
+        ),
     )
     def post(self, request, asset_id, *args, **kwargs):
+        # Request body is intentionally unused. Client-supplied uploaded=true is untrusted.
         asset = complete_upload(asset_id=asset_id, user=request.user)
         return Response(UploadAssetSerializer(asset).data)
 
@@ -76,6 +90,7 @@ class UploadDetailAPIView(APIView):
         tags=["Uploads"],
         responses={200: UploadAssetSerializer},
         summary="Get upload asset status",
+        description="Tenant-scoped. Cross-tenant reads are forbidden.",
     )
     def get(self, request, asset_id, *args, **kwargs):
         asset = get_asset_for_actor(asset_id, request.user)
@@ -89,6 +104,7 @@ class UploadCancelAPIView(APIView):
         tags=["Uploads"],
         responses={200: UploadAssetSerializer},
         summary="Cancel an unattached upload",
+        description="Idempotent. Attached assets cannot be cancelled. Detached historical objects are not deleted.",
     )
     def post(self, request, asset_id, *args, **kwargs):
         asset = cancel_upload(asset_id=asset_id, user=request.user)

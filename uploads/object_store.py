@@ -6,6 +6,7 @@ import boto3
 from botocore.config import Config as BotoConfig
 from django.conf import settings
 from django.core.files.storage import default_storage
+from uploads.keys import assert_safe_storage_key
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ def _s3_client():
 
 
 def generate_presigned_put(*, key: str, content_type: str, expires_in: int) -> dict:
+    key = assert_safe_storage_key(key)
     client, bucket = _s3_client()
     if client is None:
         dummy = getattr(settings, "UPLOADS_DUMMY_PRESIGN_BASE", "https://upload.invalid")
@@ -65,6 +67,7 @@ def generate_presigned_put(*, key: str, content_type: str, expires_in: int) -> d
 
 
 def head_object(key: str) -> dict | None:
+    key = assert_safe_storage_key(key)
     client, bucket = _s3_client()
     if client is not None:
         try:
@@ -86,10 +89,11 @@ def head_object(key: str) -> dict | None:
 
 
 def open_object(key: str):
-    return default_storage.open(key, "rb")
+    return default_storage.open(assert_safe_storage_key(key), "rb")
 
 
 def save_bytes(key: str, content, content_type: str | None = None):
+    key = assert_safe_storage_key(key)
     if default_storage.exists(key):
         default_storage.delete(key)
     if hasattr(content, "seek"):
@@ -106,6 +110,7 @@ def delete_object(key: str) -> None:
     if not key:
         return
     try:
+        key = assert_safe_storage_key(key)
         if default_storage.exists(key):
             default_storage.delete(key)
     except Exception:

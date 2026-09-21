@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import logging
+
 from django.utils import timezone
 
 from core.exceptions.uploads import (
+    UploadConflictException,
     UploadNotFoundException,
     UploadPermissionDeniedException,
     UploadStateException,
     UploadValidationException,
 )
+from uploads.authorization import assert_purpose_authorized, resolve_branch_id
 from uploads.models import UploadAsset
 from uploads.purposes import get_purpose
 from uploads.state import UploadAssetStatus, can_transition
+
+logger = logging.getLogger(__name__)
 
 
 def _mark(asset: UploadAsset, status: str, **fields) -> None:
@@ -32,12 +38,27 @@ def detach_asset(asset: UploadAsset | None) -> None:
         return
     if asset.status == UploadAssetStatus.ATTACHED:
         _mark(asset, UploadAssetStatus.DETACHED, detached_at=timezone.now())
+        logger.info(
+            "upload_detached asset_id=%s tenant_id=%s purpose=%s status=%s",
+            asset.id,
+            asset.tenant_id,
+            asset.purpose,
+            asset.status,
+        )
         return
     if asset.status == UploadAssetStatus.READY:
         _mark(asset, UploadAssetStatus.DETACHED, detached_at=timezone.now())
 
 
-def get_ready_asset(*, asset_id, user, purpose: str, tenant_id=None) -> UploadAsset:
+def get_ready_asset(
+    *,
+    asset_id,
+    user,
+    purpose: str,
+    tenant_id=None,
+    branch_id=None,
+    instance=None,
+) -> UploadAsset:
     asset = UploadAsset.objects.filter(id=asset_id).first()
     if asset is None:
         raise UploadNotFoundException()
@@ -48,6 +69,17 @@ def get_ready_asset(*, asset_id, user, purpose: str, tenant_id=None) -> UploadAs
     if asset.is_expired() and asset.status != UploadAssetStatus.ATTACHED:
         raise UploadStateException("Upload has expired.")
     policy = get_purpose(purpose)
+    assert_purpose_authorized(
+        user=user,
+        policy=policy,
+        tenant_id=tenant_id if policy.tenant_required else None,
+        branch_id=branch_id or resolve_branch_id(
+            entity_type=asset.entity_type,
+            entity_id=asset.entity_id,
+        ),
+        entity_type=asset.entity_type,
+        entity_id=asset.entity_id,
+    )
     if policy.tenant_required:
         if tenant_id is None or str(asset.tenant_id) != str(tenant_id):
             raise UploadPermissionDeniedException(
@@ -57,6 +89,12 @@ def get_ready_asset(*, asset_id, user, purpose: str, tenant_id=None) -> UploadAs
         if asset.created_by_id != user.id:
             raise UploadPermissionDeniedException(
                 "Upload does not belong to this user."
+            )
+    if asset.status == UploadAssetStatus.ATTACHED and not policy.allow_multiple:
+        current_pk = str(getattr(instance, "pk", "") or "") if instance is not None else ""
+        if asset.attached_to_id and current_pk and current_pk != str(asset.attached_to_id):
+            raise UploadConflictException(
+                "This upload is already attached to another entity."
             )
     return asset
 
@@ -80,6 +118,7 @@ def attach_asset_to_instance(
     purpose: str,
     tenant_id=None,
     attached_to_type: str = "",
+    branch_id=None,
 ) -> list[str]:
     """
     Attach or detach an asset. Does not save the instance.
@@ -102,6 +141,8 @@ def attach_asset_to_instance(
         user=user,
         purpose=purpose,
         tenant_id=tenant_id,
+        branch_id=branch_id,
+        instance=instance,
     )
     if previous and previous.id != ready.id:
         detach_asset(previous)
@@ -112,5 +153,12 @@ def attach_asset_to_instance(
         UploadAssetStatus.ATTACHED,
         attached_to_type=attached_to_type or instance._meta.label,
         attached_to_id=str(instance.pk or ""),
+    )
+    logger.info(
+        "upload_attached asset_id=%s tenant_id=%s purpose=%s status=%s",
+        ready.id,
+        ready.tenant_id,
+        ready.purpose,
+        ready.status,
     )
     return update_fields
