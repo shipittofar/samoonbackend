@@ -263,6 +263,12 @@ class CategoryDataAccessLayer:
 
     @staticmethod
     def delete_category(category: MenuCategory) -> None:
+        from core.exceptions.category import CategoryHasItemsException
+        from menu.models import MenuItem
+
+        if MenuItem.all_objects.filter(category_id=category.id).exists():
+            raise CategoryHasItemsException()
+
         branch_id = category.branch_id
         category_id = category.id
         category.delete()

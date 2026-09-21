@@ -11,7 +11,6 @@ from core.exceptions import (
     BranchNotFoundException,
     InvalidReservationStatusTransitionException,
     PartySizeExceedsCapacityException,
-    ReservationAlreadyCancelledException,
     ReservationNotCancellableException,
     ReservationNotFoundException,
     ReservationsDisabledException,
@@ -80,7 +79,7 @@ class ReservationsBusinessLogicLayer:
                 raise ReservationNotFoundException()
 
             if reservation.status == ReservationStatus.CANCELLED:
-                raise ReservationAlreadyCancelledException()
+                return reservation
             if reservation.status not in CANCELLABLE_STATUSES:
                 raise ReservationNotCancellableException()
 

@@ -376,6 +376,9 @@ class AddressDomainService:
     def delete(self, user, address_id: UUID, *, actor=None) -> None:
         address = self.dal.get_for_user_for_update(address_id, user.id)
         if address is None:
+            already = self.dal.get_deleted_for_user_for_update(address_id, user.id)
+            if already is not None:
+                return
             raise AddressNotFoundException()
         was_default = address.is_default
         self.dal.soft_delete(address)

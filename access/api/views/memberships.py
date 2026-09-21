@@ -113,7 +113,9 @@ class StaffMembershipRemoveView(GenericAPIView):
 
     def delete(self, request, *args, **kwargs):
         membership = membership_service.remove_membership(
-            tenant_id=kwargs["tenant_id"], membership_id=kwargs[self.lookup_url_kwarg]
+            tenant_id=kwargs["tenant_id"],
+            membership_id=kwargs[self.lookup_url_kwarg],
+            actor_id=request.user.id,
         )
         return Response(StaffMembershipSerializer(membership).data, status=status.HTTP_200_OK)
 

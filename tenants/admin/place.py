@@ -1,3 +1,7 @@
+"""Unused duplicate Tenant admin. Canonical registration is tenants.admin.tenant.
+
+Do not import this module — it would double-register Tenant.
+"""
 from django.contrib import admin
 from django.utils.html import format_html
 

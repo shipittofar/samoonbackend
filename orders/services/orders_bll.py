@@ -24,7 +24,6 @@ from core.exceptions import (
     MinimumOrderNotMetException,
     NotTenantOwnerException,
     OrderingDisabledException,
-    OrderAlreadyCancelledException,
     OrderNotCancellableException,
     OrderNotEditableException,
     OrderNotFoundException,
@@ -209,7 +208,7 @@ class OrdersBusinessLogicLayer:
                 raise OrderNotFoundException()
 
             if order.status == OrderStatus.CANCELLED:
-                raise OrderAlreadyCancelledException()
+                return order
 
             if order.status not in CANCELLABLE_STATUSES:
                 raise OrderNotCancellableException()
@@ -222,6 +221,25 @@ class OrdersBusinessLogicLayer:
             transaction.on_commit(lambda: notify_order_status_change(order))
 
         return self.dal.get_order_by_id(order.id)
+
+    def admin_cancel_order(self, *, order: Order) -> Order:
+        """Cancel an order from Django Admin without requiring the customer actor."""
+        with transaction.atomic():
+            locked = self.dal.get_order_by_public_id_for_update(order.id)
+            if locked is None:
+                raise OrderNotFoundException()
+            if locked.status == OrderStatus.CANCELLED:
+                return locked
+            allowed_next = STATUS_TRANSITIONS.get(locked.status, set())
+            if OrderStatus.CANCELLED not in allowed_next:
+                raise OrderNotCancellableException()
+            self.dal.update_order_fields(locked, status=OrderStatus.CANCELLED)
+            self.dal.create_status_history(
+                locked, OrderStatus.CANCELLED, note="Cancelled in Django Admin"
+            )
+            schedule_console_order_changed(locked)
+            transaction.on_commit(lambda: notify_order_status_change(locked))
+        return self.dal.get_order_by_id(locked.id)
 
     # ------------------------------------------------------------------
     # Status update (tenant owner only)

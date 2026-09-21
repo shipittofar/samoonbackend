@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 
 from core.cache import cache_get, cache_set, cache_delete
 from core.cache import CacheKeys
@@ -337,7 +338,9 @@ class ItemDataAccessLayer:
     @staticmethod
     def delete_item(item: MenuItem) -> None:
         branch_id, category_id, item_id = item.branch_id, item.category_id, item.id
-        item.delete()
+        if item.deleted_at is None:
+            item.deleted_at = timezone.now()
+            item.save(update_fields=["deleted_at", "updated_at"])
 
         def _on_commit():
             ItemDataAccessLayer._refresh_item_list_cache(
@@ -494,6 +497,14 @@ class ExtraDataAccessLayer:
 
     @staticmethod
     def delete_extra(extra: Extra) -> None:
+        from core.exceptions.item import ExtraReferencedByOrdersException
+        from orders.models import OrderItemExtra
+
+        if OrderItemExtra.objects.filter(extra_id=extra.id).exists():
+            extra.available = False
+            extra.save(update_fields=["available"])
+            raise ExtraReferencedByOrdersException()
+
         branch_id, extra_id = extra.branch_id, extra.id
         extra.delete()
 

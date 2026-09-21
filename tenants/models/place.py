@@ -1,3 +1,7 @@
+"""Unused duplicate Tenant/WorkingHour sketch — not imported by tenants.models.
+
+Canonical models live in tenants.models.tenant. Do not register or migrate this file.
+"""
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models

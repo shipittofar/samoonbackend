@@ -6,7 +6,7 @@ class CategoryAlreadyExistsException(BaseAppException):
     code = "category_already_exists"
     message = "A category with this name already exists for this place."
 
-class CategoryNotFoundException(BaseAppException):
-    status_code = 404
-    code = "category_not_found"
-    message = "Category not found."
+class CategoryHasItemsException(BaseAppException):
+    status_code = 400
+    code = "category_has_items"
+    message = "Cannot delete a category that still has menu items."

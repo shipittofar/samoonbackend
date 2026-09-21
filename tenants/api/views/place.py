@@ -84,7 +84,7 @@ class TenantListAPIView(ListAPIView):
         return tenant_bll.get_tenants()
 
 
-@extend_schema(tags=["Tenant - Tenant"], summary="delete Tenants")
+@extend_schema(tags=["Tenant - Tenant"], summary="Deactivate tenant")
 class TenantDeleteView(DestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):

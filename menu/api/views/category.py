@@ -134,7 +134,10 @@ class MenuCategoryDetailView(RetrieveAPIView):
         return Response(payload, status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=["Menu - Categories"], summary="delete Menu Categories")
+@extend_schema(
+    tags=["Menu - Categories"],
+    summary="Delete empty category (refuses if items exist)",
+)
 class MenuCategoryDeleteView(DestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):

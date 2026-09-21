@@ -186,7 +186,7 @@ class AddressAuditLog(models.Model):
     ACTION_VERIFICATION_CHANGE = "verification_change"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="audit_logs")
+    address = models.ForeignKey(Address, on_delete=models.PROTECT, related_name="audit_logs")
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

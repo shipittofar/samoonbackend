@@ -16,6 +16,7 @@ from access.models import (
     StaffMembership,
     StaffMembershipStatus,
 )
+from tenants.admin.tenant import TenantAdmin
 from tenants.models import Owner, Tenant, TenantStatus
 
 User = get_user_model()
@@ -64,9 +65,15 @@ class TenantAdminDeleteTests(TestCase):
         self.client = Client()
         self.client.force_login(self.admin_user)
 
-    def _delete_url(self, tenant=None):
-        tenant = tenant or self.tenant
-        return reverse("admin:tenants_tenant_delete", args=[tenant.id])
+    def _deactivate(self, *tenants):
+        selected = [str(t.id) for t in (tenants or (self.tenant,))]
+        return self.client.post(
+            reverse("admin:tenants_tenant_changelist"),
+            {
+                "action": "deactivate_selected_tenants",
+                "_selected_action": selected,
+            },
+        )
 
     def _membership(self, user=None, tenant=None):
         return StaffMembership.objects.create(
@@ -83,10 +90,11 @@ class TenantAdminDeleteTests(TestCase):
         )
 
     def test_delete_tenant_with_no_memberships(self):
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._deactivate()
         self.assertEqual(response.status_code, 302)
         self.tenant.refresh_from_db()
         self.assertEqual(self.tenant.status, TenantStatus.INACTIVE)
+        self.assertFalse(self.tenant.is_active)
         self.assertTrue(Tenant.objects.filter(id=self.tenant.id).exists())
 
     def test_delete_tenant_with_active_assignment(self):
@@ -94,7 +102,7 @@ class TenantAdminDeleteTests(TestCase):
         assignment = _create_assignment(membership=membership, role=self.manager_role)
         audit = self._audit()
 
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._deactivate()
         self.assertEqual(response.status_code, 302)
 
         self.tenant.refresh_from_db()
@@ -102,7 +110,9 @@ class TenantAdminDeleteTests(TestCase):
         assignment.refresh_from_db()
         audit.refresh_from_db()
         self.assertEqual(self.tenant.status, TenantStatus.INACTIVE)
+        self.assertFalse(self.tenant.is_active)
         self.assertEqual(membership.status, StaffMembershipStatus.REMOVED)
+        self.assertEqual(assignment.status, AssignmentStatus.REVOKED)
         self.assertTrue(StaffAssignment.objects.filter(id=assignment.id).exists())
         self.assertEqual(assignment.membership_id, membership.id)
         self.assertTrue(PermissionAudit.objects.filter(id=audit.id).exists())
@@ -115,7 +125,7 @@ class TenantAdminDeleteTests(TestCase):
             role=self.manager_role,
             status=AssignmentStatus.REVOKED,
         )
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._deactivate()
         self.assertEqual(response.status_code, 302)
 
         membership.refresh_from_db()
@@ -132,7 +142,7 @@ class TenantAdminDeleteTests(TestCase):
             role=self.waiter_role,
             status=AssignmentStatus.REVOKED,
         )
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._deactivate()
         self.assertEqual(response.status_code, 302)
 
         active.refresh_from_db()
@@ -154,7 +164,7 @@ class TenantAdminDeleteTests(TestCase):
             status=AssignmentStatus.REVOKED,
         )
 
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._deactivate()
         self.assertEqual(response.status_code, 302)
 
         first.refresh_from_db()
@@ -170,23 +180,30 @@ class TenantAdminDeleteTests(TestCase):
             role=self.manager_role,
             status=AssignmentStatus.REVOKED,
         )
-        response = self.client.get(self._delete_url())
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "doesn't have permission to delete")
-        self.assertNotContains(response, "staff assignment")
+        admin = TenantAdmin(Tenant, None)
+        request = type("R", (), {"user": self.admin_user})()
+        deleted_objects, _model_count, perms_needed, protected = admin.get_deleted_objects(
+            [self.tenant], request
+        )
+        self.assertEqual(perms_needed, set())
+        self.assertEqual(protected, [])
+        self.assertFalse(admin.has_delete_permission(request, self.tenant))
+        self.assertNotIn("staff assignment", " ".join(deleted_objects).lower())
 
     def test_already_inactive_tenant_is_idempotent(self):
         self.tenant.status = TenantStatus.INACTIVE
-        self.tenant.save(update_fields=["status"])
+        self.tenant.is_active = False
+        self.tenant.save(update_fields=["status", "is_active"])
         membership = self._membership()
         assignment = _create_assignment(membership=membership, role=self.manager_role)
 
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._deactivate()
         self.assertEqual(response.status_code, 302)
         self.tenant.refresh_from_db()
         membership.refresh_from_db()
         assignment.refresh_from_db()
         self.assertEqual(self.tenant.status, TenantStatus.INACTIVE)
+        self.assertFalse(self.tenant.is_active)
         self.assertEqual(membership.status, StaffMembershipStatus.REMOVED)
         self.assertTrue(StaffAssignment.objects.filter(id=assignment.id).exists())
 
@@ -200,7 +217,13 @@ class TenantAdminDeleteTests(TestCase):
         client = Client()
         client.force_login(limited)
 
-        response = client.post(self._delete_url(), {"post": "yes"})
+        response = client.post(
+            reverse("admin:tenants_tenant_changelist"),
+            {
+                "action": "deactivate_selected_tenants",
+                "_selected_action": [str(self.tenant.id)],
+            },
+        )
         self.assertIn(response.status_code, (403, 302))
         self.tenant.refresh_from_db()
         self.assertEqual(self.tenant.status, TenantStatus.ACTIVE)
@@ -209,7 +232,7 @@ class TenantAdminDeleteTests(TestCase):
         limited = _make_user(is_superuser=False, is_staff=True)
         perms = Permission.objects.filter(
             content_type__app_label="tenants",
-            codename__in=["view_tenant", "delete_tenant"],
+            codename__in=["view_tenant", "change_tenant"],
         )
         limited.user_permissions.add(*perms)
         membership = self._membership()
@@ -221,7 +244,13 @@ class TenantAdminDeleteTests(TestCase):
         client = Client()
         client.force_login(limited)
 
-        response = client.post(self._delete_url(), {"post": "yes"})
+        response = client.post(
+            reverse("admin:tenants_tenant_changelist"),
+            {
+                "action": "deactivate_selected_tenants",
+                "_selected_action": [str(self.tenant.id)],
+            },
+        )
         self.assertEqual(response.status_code, 302)
         self.tenant.refresh_from_db()
         assignment.refresh_from_db()
@@ -240,15 +269,7 @@ class TenantAdminDeleteTests(TestCase):
         assignment = _create_assignment(membership=membership, role=self.manager_role)
         audit = self._audit()
 
-        changelist = reverse("admin:tenants_tenant_changelist")
-        response = self.client.post(
-            changelist,
-            {
-                "action": "delete_selected",
-                "_selected_action": [str(self.tenant.id), str(other.id)],
-                "post": "yes",
-            },
-        )
+        response = self._deactivate(self.tenant, other)
         self.assertEqual(response.status_code, 302)
 
         self.tenant.refresh_from_db()
@@ -257,7 +278,22 @@ class TenantAdminDeleteTests(TestCase):
         assignment.refresh_from_db()
         audit.refresh_from_db()
         self.assertEqual(self.tenant.status, TenantStatus.INACTIVE)
+        self.assertFalse(self.tenant.is_active)
         self.assertEqual(other.status, TenantStatus.INACTIVE)
         self.assertEqual(membership.status, StaffMembershipStatus.REMOVED)
         self.assertTrue(StaffAssignment.objects.filter(id=assignment.id).exists())
         self.assertTrue(PermissionAudit.objects.filter(id=audit.id).exists())
+
+    def test_delete_selected_cannot_bypass_lifecycle(self):
+        response = self.client.post(
+            reverse("admin:tenants_tenant_changelist"),
+            {
+                "action": "delete_selected",
+                "_selected_action": [str(self.tenant.id)],
+                "post": "yes",
+            },
+        )
+        self.tenant.refresh_from_db()
+        self.assertEqual(self.tenant.status, TenantStatus.ACTIVE)
+        self.assertTrue(Tenant.objects.filter(id=self.tenant.id).exists())
+        self.assertNotEqual(response.status_code, 500)

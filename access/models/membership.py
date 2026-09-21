@@ -30,7 +30,7 @@ class StaffMembership(models.Model):
 
     tenant = models.ForeignKey(
         "tenants.Tenant",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="staff_memberships",
     )
     user = models.ForeignKey(
@@ -78,7 +78,7 @@ class StaffAssignment(models.Model):
 
     membership = models.ForeignKey(
         StaffMembership,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="assignments",
     )
     role = models.ForeignKey(

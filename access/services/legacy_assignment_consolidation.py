@@ -1,3 +1,11 @@
+"""One approved StaffAssignment physical-delete exception.
+
+Normal product/Admin paths must revoke assignments, never delete them.
+This module is invoked only by the `consolidate_legacy_assignments` management
+command. It physically deletes true duplicate ACTIVE/FUTURE assignment rows
+(same membership+role) after merging locations onto a single survivor.
+Revoked/expired history is never a consolidation target.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

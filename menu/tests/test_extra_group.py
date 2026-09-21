@@ -15,6 +15,7 @@ from core.exceptions import (
     ExtraGroupValidationException,
     ExtraGroupNotActiveException,
     ExtraGroupAlreadyExistsException,
+    ExtraAlreadyExistsException,
 )
 from accounts.models import User
 from tenants.models import Tenant, Branch, Owner
@@ -185,3 +186,40 @@ class MenuItemExtraGroupAssignmentTests(TestCase):
             group_ids=[],
         )
         self.assertEqual(MenuItemExtra.objects.filter(item=self.item).count(), 0)
+
+
+class ExtraDuplicateNameTests(TestCase):
+    def setUp(self):
+        self.branch = make_branch()
+        self.bll = ExtraBusinessLogicLayer()
+
+    def test_duplicate_extra_name_per_branch_rejected(self):
+        self.bll.create_extra(
+            branch_id=self.branch.id,
+            name="Cheese",
+            price=Decimal("1.00"),
+        )
+        with self.assertRaises(ExtraAlreadyExistsException):
+            self.bll.create_extra(
+                branch_id=self.branch.id,
+                name="Cheese",
+                price=Decimal("2.00"),
+            )
+
+    def test_update_extra_to_existing_name_rejected(self):
+        first = self.bll.create_extra(
+            branch_id=self.branch.id,
+            name="Bacon",
+            price=Decimal("1.00"),
+        )
+        self.bll.create_extra(
+            branch_id=self.branch.id,
+            name="Egg",
+            price=Decimal("1.00"),
+        )
+        with self.assertRaises(ExtraAlreadyExistsException):
+            self.bll.update_extra(
+                extra_id=first.id,
+                branch_id=self.branch.id,
+                name="Egg",
+            )

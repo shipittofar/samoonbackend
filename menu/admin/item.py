@@ -29,6 +29,17 @@ class TagAdmin(admin.ModelAdmin):
         return obj.items.count()
     item_count.short_description = "Items using this tag"
 
+    def delete_model(self, request, obj):
+        from menu.services.tag_bll import TagBusinessLogicLayer
+
+        TagBusinessLogicLayer.delete_tag(obj.id, obj.branch_id)
+
+    def delete_queryset(self, request, queryset):
+        from menu.services.tag_bll import TagBusinessLogicLayer
+
+        for obj in queryset:
+            TagBusinessLogicLayer.delete_tag(obj.id, obj.branch_id)
+
 
 class MenuItemExtraInline(admin.TabularInline):
     """
@@ -62,6 +73,22 @@ class MenuItemAdmin(admin.ModelAdmin):
     autocomplete_fields = ("tags",)
     readonly_fields = ("slug", "created_at", "updated_at", "image_preview")
     inlines = [MenuItemExtraInline]
+    actions = ["remove_from_catalog"]
+
+    def get_queryset(self, request):
+        return MenuItem.all_objects.all()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description="Remove selected items from catalog")
+    def remove_from_catalog(self, request, queryset):
+        from menu.services.item_bll import ItemBusinessLogicLayer
+
+        for item in queryset:
+            ItemBusinessLogicLayer.delete_menu_item(
+                item.id, item.category_id, item.branch_id
+            )
 
     fieldsets = (
         (None, {
@@ -125,3 +152,20 @@ class ExtraAdmin(admin.ModelAdmin):
     def linked_item_count(self, obj):
         return obj.item_links.count()
     linked_item_count.short_description = "Linked items"
+
+    def delete_model(self, request, obj):
+        from core.exceptions.item import ExtraReferencedByOrdersException
+        from menu.services.item_bll import ExtraBusinessLogicLayer
+
+        try:
+            ExtraBusinessLogicLayer.delete_extra(obj.id, obj.branch_id)
+        except ExtraReferencedByOrdersException:
+            self.message_user(
+                request,
+                "This extra is used on historical orders and was marked unavailable.",
+                level="warning",
+            )
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            self.delete_model(request, obj)

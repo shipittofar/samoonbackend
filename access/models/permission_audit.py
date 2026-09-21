@@ -16,6 +16,8 @@ class PermissionAuditAction(models.TextChoices):
     OVERRIDE_REMOVED = "override.removed", "Override removed"
     ROLE_PERMISSIONS_CHANGED = "role.permissions_changed", "Role permissions changed"
     OWNERSHIP_TRANSFERRED = "ownership.transferred", "Ownership transferred"
+    MEMBERSHIP_REMOVED = "membership.removed", "Membership removed"
+    TENANT_DEACTIVATED = "tenant.deactivated", "Tenant deactivated"
 
 
 class PermissionAudit(models.Model):
@@ -30,7 +32,7 @@ class PermissionAudit(models.Model):
     )
     tenant = models.ForeignKey(
         "tenants.Tenant",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="permission_audit_entries",
         null=True,
         blank=True,

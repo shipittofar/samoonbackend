@@ -132,19 +132,25 @@ class StaffMembershipAdminDeleteTests(TestCase):
         self.client = Client()
         self.client.force_login(self.admin_user)
 
-    def _delete_url(self, membership=None):
+    def _changelist_remove(self, membership=None):
         membership = membership or self.membership
-        return reverse("admin:access_staffmembership_delete", args=[membership.id])
+        return self.client.post(
+            reverse("admin:access_staffmembership_changelist"),
+            {
+                "action": "remove_selected_memberships",
+                "_selected_action": [str(membership.id)],
+            },
+        )
 
     def test_delete_membership_with_active_assignment_soft_removes(self):
         assignment = _create_assignment(membership=self.membership, role=self.role)
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._changelist_remove()
         self.assertEqual(response.status_code, 302)
 
         self.membership.refresh_from_db()
         assignment.refresh_from_db()
         self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)
-        self.assertEqual(assignment.status, AssignmentStatus.ACTIVE)
+        self.assertEqual(assignment.status, AssignmentStatus.REVOKED)
         self.assertEqual(assignment.membership_id, self.membership.id)
 
     def test_delete_membership_with_revoked_assignment_keeps_audit_row(self):
@@ -153,7 +159,7 @@ class StaffMembershipAdminDeleteTests(TestCase):
             role=self.role,
             status=AssignmentStatus.REVOKED,
         )
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._changelist_remove()
         self.assertEqual(response.status_code, 302)
 
         self.membership.refresh_from_db()
@@ -169,14 +175,14 @@ class StaffMembershipAdminDeleteTests(TestCase):
             role=self.waiter_role,
             status=AssignmentStatus.REVOKED,
         )
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._changelist_remove()
         self.assertEqual(response.status_code, 302)
 
         self.membership.refresh_from_db()
         active.refresh_from_db()
         revoked.refresh_from_db()
         self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)
-        self.assertEqual(active.status, AssignmentStatus.ACTIVE)
+        self.assertEqual(active.status, AssignmentStatus.REVOKED)
         self.assertEqual(revoked.status, AssignmentStatus.REVOKED)
         self.assertEqual(StaffAssignment.objects.filter(membership=self.membership).count(), 2)
 
@@ -186,15 +192,21 @@ class StaffMembershipAdminDeleteTests(TestCase):
             role=self.role,
             status=AssignmentStatus.REVOKED,
         )
-        response = self.client.get(self._delete_url())
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "doesn't have permission to delete")
-        self.assertNotContains(response, "staff assignment")
+        admin = StaffMembershipAdmin(StaffMembership, None)
+        request = type("R", (), {"user": self.admin_user})()
+        deleted_objects, _model_count, perms_needed, protected = admin.get_deleted_objects(
+            [self.membership], request
+        )
+        self.assertEqual(perms_needed, set())
+        self.assertEqual(protected, [])
+        self.assertFalse(admin.has_delete_permission(request, self.membership))
+        blob = " ".join(deleted_objects).lower()
+        self.assertNotIn("staff assignment", blob)
 
     def test_already_removed_membership_is_skipped(self):
         self.membership.status = StaffMembershipStatus.REMOVED
         self.membership.save(update_fields=["status"])
-        response = self.client.post(self._delete_url(), {"post": "yes"})
+        response = self._changelist_remove()
         self.assertEqual(response.status_code, 302)
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)
@@ -210,7 +222,13 @@ class StaffMembershipAdminDeleteTests(TestCase):
         client = Client()
         client.force_login(limited)
 
-        response = client.post(self._delete_url(), {"post": "yes"})
+        response = client.post(
+            reverse("admin:access_staffmembership_changelist"),
+            {
+                "action": "remove_selected_memberships",
+                "_selected_action": [str(self.membership.id)],
+            },
+        )
         self.assertIn(response.status_code, (403, 302))
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.status, StaffMembershipStatus.ACTIVE)
@@ -221,7 +239,7 @@ class StaffMembershipAdminDeleteTests(TestCase):
             content_type__app_label="access",
             codename__in=[
                 "view_staffmembership",
-                "delete_staffmembership",
+                "change_staffmembership",
                 "view_staffassignment",
             ],
         )
@@ -234,7 +252,13 @@ class StaffMembershipAdminDeleteTests(TestCase):
         client = Client()
         client.force_login(limited)
 
-        response = client.post(self._delete_url(), {"post": "yes"})
+        response = client.post(
+            reverse("admin:access_staffmembership_changelist"),
+            {
+                "action": "remove_selected_memberships",
+                "_selected_action": [str(self.membership.id)],
+            },
+        )
         self.assertEqual(response.status_code, 302)
         self.membership.refresh_from_db()
         self.assertEqual(self.membership.status, StaffMembershipStatus.REMOVED)

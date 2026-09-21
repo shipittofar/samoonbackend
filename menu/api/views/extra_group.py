@@ -132,8 +132,11 @@ class ExtraGroupUpdateView(UpdateAPIView):
 
 @extend_schema(
     tags=["Menu - Extra Groups"],
-    summary="delete Extra Group",
-    description="Delete an existing extra group.",
+    summary="Delete extra group, or deactivate if extras exist",
+    description=(
+        "Hard-deletes an extra group only when it has no extras. "
+        "Otherwise the group is deactivated (is_active=False)."
+    )
 )
 class ExtraGroupDeleteView(DestroyAPIView):
 

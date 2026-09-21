@@ -7,8 +7,9 @@ from access.services.legacy_assignment_consolidation import run_consolidation
 
 class Command(BaseCommand):
     help = (
-        "Consolidate legacy duplicate ACTIVE/FUTURE StaffAssignment rows that share "
-        "the same membership and role into one assignment with StaffAssignmentLocation rows."
+        "Maintenance exception: physically merge/delete duplicate ACTIVE/FUTURE "
+        "StaffAssignment rows for the same membership+role. Never use Django Admin "
+        "delete for assignments. Revoked/expired history rows are not consolidation targets."
     )
 
     def add_arguments(self, parser):

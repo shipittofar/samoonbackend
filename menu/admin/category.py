@@ -57,6 +57,9 @@ class MenuCategoryAdmin(admin.ModelAdmin):
         return obj.items.count()
     item_count.short_description = "Items"
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     def image_preview(self, obj):
         if obj.image:
             return format_html(

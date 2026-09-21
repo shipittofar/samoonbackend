@@ -122,7 +122,7 @@ class ConsoleTenantListAPIView(ListAPIView):
         return tenant_bll.get_console_tenants(user=self.request.user)
 
 
-@extend_schema(tags=["Tenant - Tenant"], summary="delete Tenant")
+@extend_schema(tags=["Tenant - Tenant"], summary="Deactivate tenant")
 class TenantDeleteView(DestroyAPIView):
     permission_classes = (IsAuthenticated,)
 
@@ -222,7 +222,7 @@ class BranchListAPIView(ListAPIView):
         return branch_bll.get_branches(tenant_id=self.kwargs["tenant_id"])
 
 
-@extend_schema(tags=["Tenant - Branch"], summary="delete Branch")
+@extend_schema(tags=["Tenant - Branch"], summary="Deactivate branch")
 class BranchDeleteView(DestroyAPIView):
     permission_classes = (IsAuthenticated,)
 
@@ -235,7 +235,7 @@ class BranchDeleteView(DestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@extend_schema(tags=["Tenant - Branch"], summary="delete Branch")
+@extend_schema(tags=["Tenant - Branch"], summary="Deactivate branch")
 class ConsoleBranchDeleteView(DestroyAPIView):
     permission_classes = (IsAuthenticated,)
 

@@ -33,6 +33,12 @@ class AddressAdmin(admin.ModelAdmin):
     list_select_related = ("user", "verified_by")
     readonly_fields = ("id", "uuid", "legacy_id", "fingerprint", "formatted_address", "created_at", "updated_at")
 
+    def get_queryset(self, request):
+        return Address.all_objects.all()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(AddressAuditLog)
 class AddressAuditLogAdmin(admin.ModelAdmin):
@@ -41,3 +47,6 @@ class AddressAuditLogAdmin(admin.ModelAdmin):
     search_fields = ("address__title", "address__street", "user__email")
     readonly_fields = ("id", "created_at")
     list_select_related = ("address", "actor", "user")
+
+    def has_delete_permission(self, request, obj=None):
+        return False

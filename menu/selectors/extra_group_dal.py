@@ -170,6 +170,14 @@ class ExtraGroupDataAccessLayer:
     @staticmethod
     def delete_extra_group(group: ExtraGroup) -> None:
         branch_id, group_id = group.branch_id, group.id
+        if group.extras.exists():
+            group.is_active = False
+            group.save(update_fields=["is_active"])
+            transaction.on_commit(
+                lambda: ExtraGroupDataAccessLayer._refresh_extra_group_list_cache(branch_id)
+            )
+            return
+
         group.delete()
 
         def _on_commit():

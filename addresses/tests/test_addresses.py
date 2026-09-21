@@ -102,7 +102,22 @@ class AddressDomainServiceTests(TestCase):
             self.domain.create(self.user, valid_address_payload())
         self.assertTrue(any(e.name == "AddressCreated" for e in self.events))
 
-    def test_restore_soft_deleted_address(self):
+    def test_soft_delete_is_idempotent_and_preserves_audit(self):
+        address = self.domain.create(self.user, valid_address_payload(), actor=self.user)
+        self.domain.delete(self.user, address.id, actor=self.user)
+        self.domain.delete(self.user, address.id, actor=self.user)
+        stored = Address.all_objects.get(pk=address.id)
+        self.assertIsNotNone(stored.deleted_at)
+        self.assertTrue(AddressAuditLog.objects.filter(address=stored).exists())
+        self.assertFalse(Address.objects.filter(pk=address.id).exists())
+
+    def test_address_admin_cannot_hard_delete(self):
+        from addresses.admin.address import AddressAdmin, AddressAuditLogAdmin
+        from addresses.models import AddressAuditLog as AuditModel
+
+        request = type("R", (), {"user": self.user})()
+        self.assertFalse(AddressAdmin(Address, None).has_delete_permission(request))
+        self.assertFalse(AddressAuditLogAdmin(AuditModel, None).has_delete_permission(request))
         address = self.domain.create(self.user, valid_address_payload())
         self.domain.delete(self.user, address.id, actor=self.user)
         restored = self.domain.restore(self.user, address.id, actor=self.user)

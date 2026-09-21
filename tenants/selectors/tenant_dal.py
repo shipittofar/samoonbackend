@@ -277,7 +277,8 @@ class TenantDataAccessLayer:
     @staticmethod
     def inactive_tenant(tenant: Tenant) -> Tenant:
         tenant.status = TenantStatus.INACTIVE
-        tenant.save(update_fields=["status", "updated_at"])
+        tenant.is_active = False
+        tenant.save(update_fields=["status", "is_active", "updated_at"])
 
         owner_user_id = getattr(tenant, "owner_user_id", None) or tenant.owner.user_id
         transaction.on_commit(

@@ -162,11 +162,17 @@ class TenantAdmin(admin.ModelAdmin):
         (_("Timestamps"), {"fields": ("created_at", "updated_at")}),
     )
 
+    actions = ["deactivate_selected_tenants"]
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     @admin.display(description=_("Branches"))
     def branch_count(self, obj):
         return obj.branches.count()
 
     def get_deleted_objects(self, objs, request):
+        # Deactivate does not physically delete related StaffAssignment history.
         deleted_objects = [str(obj) for obj in objs]
         model_count = {Tenant._meta.verbose_name: len(list(objs))}
         perms_needed = set()
@@ -177,6 +183,11 @@ class TenantAdmin(admin.ModelAdmin):
         self._soft_remove_tenant(request, obj)
 
     def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            self._soft_remove_tenant(request, obj)
+
+    @admin.action(description=_("Deactivate selected tenants"))
+    def deactivate_selected_tenants(self, request, queryset):
         for obj in queryset:
             self._soft_remove_tenant(request, obj)
 
@@ -304,6 +315,21 @@ class BranchAdmin(admin.ModelAdmin):
         (_("Advanced"), {"fields": ("settings", "metadata")}),
         (_("Timestamps"), {"fields": ("created_at", "updated_at")}),
     )
+    actions = ["deactivate_selected_branches"]
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description=_("Deactivate selected branches"))
+    def deactivate_selected_branches(self, request, queryset):
+        from tenants.services.tenant_bll import BranchBusinessLogicLayer
+
+        for branch in queryset:
+            BranchBusinessLogicLayer.delete_branch(
+                user=request.user,
+                tenant_id=branch.tenant_id,
+                branch_id=branch.id,
+            )
 
 
 @admin.register(WorkingHour)

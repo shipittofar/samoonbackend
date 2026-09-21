@@ -208,5 +208,36 @@ class PermissionAuditBusinessLogicLayer:
             ),
         )
 
+    def record_membership_removed(self, *, membership, actor_id=None) -> PermissionAudit:
+        return self.record(
+            action=PermissionAuditAction.MEMBERSHIP_REMOVED,
+            tenant_id=membership.tenant_id,
+            actor_id=actor_id,
+            membership_id=membership.id,
+            metadata=self._audit_metadata(
+                target_user=str(membership.user_id),
+                old_value={"status": "active"},
+                new_value={"status": membership.status},
+            ),
+        )
+
+    def record_tenant_deactivated(
+        self,
+        *,
+        tenant,
+        actor_id=None,
+        previous_status=None,
+        previous_is_active=None,
+    ) -> PermissionAudit:
+        return self.record(
+            action=PermissionAuditAction.TENANT_DEACTIVATED,
+            tenant_id=tenant.id,
+            actor_id=actor_id,
+            metadata=self._audit_metadata(
+                old_value={"status": previous_status, "is_active": previous_is_active},
+                new_value={"status": tenant.status, "is_active": tenant.is_active},
+            ),
+        )
+
 
 permission_audit_bll = PermissionAuditBusinessLogicLayer()

@@ -254,9 +254,34 @@ class ItemBusinessLogicLayer:
             branch_id=branch_id,
         )
         if item is None:
+            from menu.models import MenuItem
+
+            item = MenuItem.all_objects.filter(
+                id=item_id,
+                category_id=category_id,
+                branch_id=branch_id,
+            ).first()
+        if item is None:
             raise MenuItemNotFoundException()
 
         item_dal.delete_item(item)
+
+    @staticmethod
+    def restore_menu_item(item_id, category_id, branch_id) -> MenuItem:
+        from menu.models import MenuItem
+
+        item = MenuItem.all_objects.filter(
+            id=item_id,
+            category_id=category_id,
+            branch_id=branch_id,
+        ).first()
+        if item is None:
+            raise MenuItemNotFoundException()
+        if item.deleted_at is not None:
+            item.deleted_at = None
+            item.save(update_fields=["deleted_at", "updated_at"])
+            item_dal.invalidate_item_cache(item.branch_id, item.category_id, item.id)
+        return item
 
 
 class ExtraBusinessLogicLayer:

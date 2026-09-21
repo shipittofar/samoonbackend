@@ -47,10 +47,16 @@ class ExtraNotFoundException(BaseAppException):
     code = "extera_not_found"
     message = "Extera not found."
 
+
 class ExtraAlreadyExistsException(BaseAppException):
     status_code = 400
-    code = "extera_already_exists"
-    message = "A extera with this name already exists in this place."
+    code = "extra_already_exists"
+    message = "An extra with this name already exists in this branch."
+
+class ExtraReferencedByOrdersException(BaseAppException):
+    status_code = 409
+    code = "extra_referenced_by_orders"
+    message = "This extra is used on historical orders and cannot be deleted."
 
 class MenuItemExtraAlreadyExistsException(BaseAppException):
     status_code = 400

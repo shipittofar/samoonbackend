@@ -236,14 +236,13 @@ class TenantBusinessLogicLayer:
         return tenant_dal.get_tenants()
 
     @staticmethod
+    @transaction.atomic
     def delete_tenant(tenant_id: int) -> Tenant:
-        tenant = tenant_dal.get_tenant_for_update(tenant_id)
+        from tenants.services.tenant_bll import TenantBusinessLogicLayer as ConsoleTenantBLL
+
+        tenant = tenant_dal.get_tenant_for_update(tenant_id, lock=True)
 
         if tenant is None:
             raise TenantNotFoundException()
 
-        tenant = tenant_dal.inactive_tenant(tenant)
-        from tenants.services.tenant_bll import TenantBusinessLogicLayer
-
-        TenantBusinessLogicLayer._remove_staff_memberships_for_tenant(tenant)
-        return tenant
+        return ConsoleTenantBLL.deactivate_tenant_record(tenant, actor_id=None)

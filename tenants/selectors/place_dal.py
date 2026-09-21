@@ -1,4 +1,4 @@
-from tenants.models import Tenant, TenantStatus
+from tenants.models import Tenant
 
 
 class TenantDataAccessLayer:
@@ -49,7 +49,6 @@ class TenantDataAccessLayer:
 
     @staticmethod
     def inactive_tenant(tenant: Tenant) -> Tenant:
-        tenant.status = TenantStatus.INACTIVE
-        tenant.is_active = False
-        tenant.save(update_fields=["status", "is_active", "updated_at"])
-        return tenant
+        from tenants.selectors.tenant_dal import TenantDataAccessLayer as ConsoleTenantDAL
+
+        return ConsoleTenantDAL.inactive_tenant(tenant)

@@ -520,7 +520,7 @@ class MenuItemDetailView(RetrieveAPIView):
         return Response(payload, status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=["Menu - Items"], summary="delete Menu Items")
+@extend_schema(tags=["Menu - Items"], summary="Soft-delete menu item (sets deleted_at)")
 class MenuItemDeleteView(DestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
@@ -620,8 +620,11 @@ class ExtraUpdateView(UpdateAPIView):
 
 @extend_schema(
     tags=["Menu - Extras"],
-    summary="delete Extra",
-    description="Delete an existing extra."
+    summary="Delete extra, or deactivate if referenced by orders",
+    description=(
+        "Hard-deletes an extra only when unused by historical order snapshots. "
+        "If OrderItemExtra references exist, the extra is marked unavailable and a 409 is returned."
+    )
 )
 class ExtraDeleteView(DestroyAPIView):
 

@@ -190,36 +190,61 @@ class TenantBusinessLogicLayer:
         return tenant_dal.get_console_tenants(user)
 
     @staticmethod
+    @transaction.atomic
     def delete_tenant(user, tenant_id: int) -> Tenant:
-        tenant = tenant_dal.get_tenant_for_update(tenant_id)
+        tenant = tenant_dal.get_tenant_for_update(tenant_id, lock=True)
 
         if tenant is None:
             raise TenantNotFoundException()
 
         _assert_owns_tenant(user, tenant)
 
+        return TenantBusinessLogicLayer.deactivate_tenant_record(
+            tenant, actor_id=getattr(user, "id", None)
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def deactivate_tenant_record(tenant: Tenant, actor_id=None) -> Tenant:
+        """Canonical tenant deactivation. Does not physically delete rows.
+
+        Lock ordering: tenant row (caller) → memberships → assignments.
+        """
+        from access.services.permission_audit_bll import permission_audit_bll
+
+        previous_status = tenant.status
+        previous_is_active = tenant.is_active
+        already_inactive = (
+            tenant.status == TenantStatus.INACTIVE and tenant.is_active is False
+        )
         tenant = tenant_dal.inactive_tenant(tenant)
-        TenantBusinessLogicLayer._remove_staff_memberships_for_tenant(tenant)
+        if not already_inactive:
+            permission_audit_bll.record_tenant_deactivated(
+                tenant=tenant,
+                actor_id=actor_id,
+                previous_status=previous_status,
+                previous_is_active=previous_is_active,
+            )
+        TenantBusinessLogicLayer._remove_staff_memberships_for_tenant(
+            tenant, actor_id=actor_id
+        )
         return tenant
 
     @staticmethod
-    def _remove_staff_memberships_for_tenant(tenant: Tenant) -> None:
+    def _remove_staff_memberships_for_tenant(tenant: Tenant, actor_id=None) -> None:
         """Soft-remove memberships; StaffAssignment rows stay as grant/revoke history."""
         from access.models import StaffMembership, StaffMembershipStatus
         from access.services.membership_bll import membership_service
-        from core.exceptions import StaffMembershipAlreadyRemovedException
 
         memberships = StaffMembership.objects.filter(tenant_id=tenant.id).exclude(
             status=StaffMembershipStatus.REMOVED
         )
         for membership in memberships:
-            try:
-                membership_service.remove_membership(
-                    tenant_id=tenant.id,
-                    membership_id=membership.id,
-                )
-            except StaffMembershipAlreadyRemovedException:
-                continue
+            membership_service.remove_membership(
+                tenant_id=tenant.id,
+                membership_id=membership.id,
+                actor_id=actor_id,
+            )
 
     @staticmethod
     def get_my_tenants(user):

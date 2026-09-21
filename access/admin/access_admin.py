@@ -231,12 +231,9 @@ class StaffAssignmentInline(admin.TabularInline):
 @admin.register(StaffMembership)
 class StaffMembershipAdmin(admin.ModelAdmin):
     """
-    Admin delete is a BLL soft-remove (status=removed), not a CASCADE hard delete.
-
-    StaffAssignment.membership uses on_delete=CASCADE, so Django's NestedObjects
-    collector would otherwise require delete_staffassignment. Hard-deleting
-    assignments is intentionally disabled (revoke/audit history). Soft-remove
-    keeps assignment rows and matches membership_service.remove_membership.
+    Membership removal is BLL-owned (status=removed + revoke non-terminal
+    assignments). StaffAssignment.membership is PROTECT so accidental physical
+    deletion cannot cascade assignment history. Named action replaces Delete UI.
     """
 
     list_display = ["user", "tenant", "status", "invited_by", "joined_at", "created_at"]
@@ -245,6 +242,15 @@ class StaffMembershipAdmin(admin.ModelAdmin):
     autocomplete_fields = ["user", "tenant", "invited_by"]
     readonly_fields = ["id", "created_at", "updated_at"]
     inlines = [StaffAssignmentInline]
+    actions = ["remove_selected_memberships"]
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description="Remove selected memberships")
+    def remove_selected_memberships(self, request, queryset):
+        for obj in queryset:
+            self._soft_remove_membership(request, obj)
 
     def get_deleted_objects(self, objs, request):
         # Soft-remove does not delete related StaffAssignment / location rows.
@@ -266,6 +272,7 @@ class StaffMembershipAdmin(admin.ModelAdmin):
             membership_service.remove_membership(
                 tenant_id=obj.tenant_id,
                 membership_id=obj.id,
+                actor_id=getattr(request.user, "id", None),
             )
         except StaffMembershipAlreadyRemovedException:
             self.message_user(

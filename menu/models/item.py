@@ -9,6 +9,23 @@ from django.utils.deconstruct import deconstructible
 from core.models import WebPImageMixin
 from core.utils.slug import assign_unique_branch_slug, assign_unique_slug
 
+
+class CatalogMenuItemQuerySet(models.QuerySet):
+    def alive(self):
+        return self.filter(deleted_at__isnull=True)
+
+
+class CatalogMenuItemManager(models.Manager):
+    """Product catalog rows; excludes soft-deleted items."""
+
+    def get_queryset(self):
+        return CatalogMenuItemQuerySet(self.model, using=self._db).alive()
+
+
+class AllMenuItemManager(models.Manager):
+    def get_queryset(self):
+        return CatalogMenuItemQuerySet(self.model, using=self._db)
+
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 TAG_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif"]
 
@@ -102,7 +119,7 @@ class MenuItem(WebPImageMixin, models.Model):
 
     category = models.ForeignKey(
         "menu.MenuCategory",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="items",
     )
 
@@ -170,6 +187,9 @@ class MenuItem(WebPImageMixin, models.Model):
         blank=True,
         help_text="Soft-delete timestamp. Set when the item is removed without hard deletion.",
     )
+
+    objects = CatalogMenuItemManager()
+    all_objects = AllMenuItemManager()
 
     def save(self, *args, **kwargs):
         assign_unique_slug(self, MenuItem)

@@ -60,6 +60,7 @@ class OrderAdmin(admin.ModelAdmin):
     readonly_fields = ("id", "order_number", "created_at", "updated_at")
     list_select_related = ("customer", "branch")
     inlines = (OrderItemInline, OrderStatusHistoryInline)
+    actions = ["cancel_selected_orders"]
     fieldsets = (
         (None, {"fields": ("id", "order_number", "customer", "branch")}),
         (
@@ -94,12 +95,34 @@ class OrderAdmin(admin.ModelAdmin):
     def item_count(self, obj):
         return obj.items.count()
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description=_("Cancel selected orders"))
+    def cancel_selected_orders(self, request, queryset):
+        from core.exceptions import OrderNotCancellableException
+        from orders.services.orders_bll import OrdersBusinessLogicLayer
+
+        bll = OrdersBusinessLogicLayer()
+        for order in queryset:
+            try:
+                bll.admin_cancel_order(order=order)
+            except OrderNotCancellableException:
+                self.message_user(
+                    request,
+                    f"Order {order.order_number} cannot be cancelled.",
+                    level="warning",
+                )
+
 
 @admin.register(OrderDeliveryAddress)
 class OrderDeliveryAddressAdmin(admin.ModelAdmin):
     list_display = ("street", "city", "province", "country", "created_at")
     search_fields = ("street", "city", "postal_code", "phone", "first_name", "last_name")
     readonly_fields = ("id", "source_address_id", "created_at")
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(OrderItem)
@@ -112,6 +135,9 @@ class OrderItemAdmin(admin.ModelAdmin):
     list_select_related = ("order", "menu_item")
     inlines = (OrderItemExtraInline,)
 
+    def has_delete_permission(self, request, obj=None):
+        return False
+
 
 @admin.register(OrderItemExtra)
 class OrderItemExtraAdmin(admin.ModelAdmin):
@@ -119,6 +145,9 @@ class OrderItemExtraAdmin(admin.ModelAdmin):
     search_fields = ("order_item__name", "extra__name")
     autocomplete_fields = ("order_item", "extra")
     list_select_related = ("order_item", "extra")
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(OrderStatusHistory)
@@ -129,3 +158,6 @@ class OrderStatusHistoryAdmin(admin.ModelAdmin):
     autocomplete_fields = ("order",)
     readonly_fields = ("timestamp",)
     ordering = ("-timestamp",)
+
+    def has_delete_permission(self, request, obj=None):
+        return False

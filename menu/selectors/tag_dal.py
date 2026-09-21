@@ -205,6 +205,14 @@ class TagDataAccessLayer:
     @staticmethod
     def delete_tag(tag: Tag) -> None:
         branch_id, tag_id = tag.branch_id, tag.id
+        if tag.items.exists():
+            tag.is_active = False
+            tag.save(update_fields=["is_active", "updated_at"])
+            transaction.on_commit(
+                lambda: TagDataAccessLayer._refresh_tag_list_cache(branch_id)
+            )
+            return
+
         tag.delete()
 
         def _on_commit():

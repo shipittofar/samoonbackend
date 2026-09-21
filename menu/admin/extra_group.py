@@ -22,8 +22,17 @@ class ExtraGroupAdmin(admin.ModelAdmin):
 
         formset.save_m2m()
 
+        from core.exceptions.item import ExtraReferencedByOrdersException
+        from menu.selectors.item_dal import ExtraDataAccessLayer
+
         for obj in formset.deleted_objects:
-            obj.delete()
+            if isinstance(obj, Extra):
+                try:
+                    ExtraDataAccessLayer.delete_extra(obj)
+                except ExtraReferencedByOrdersException:
+                    pass
+            else:
+                obj.delete()
 
     list_display = (
         "name", "branch", "selection_type", "required",
@@ -33,6 +42,7 @@ class ExtraGroupAdmin(admin.ModelAdmin):
     search_fields = ("name",)
     ordering = ("order",)
     inlines = [ExtraInline]
+    actions = ["remove_or_deactivate_extra_groups"]
 
     fieldsets = (
         (None, {
@@ -48,3 +58,21 @@ class ExtraGroupAdmin(admin.ModelAdmin):
             "fields": ("order", "is_active")
         }),
     )
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def delete_model(self, request, obj):
+        from menu.services.extra_group_bll import ExtraGroupBusinessLogicLayer
+
+        ExtraGroupBusinessLogicLayer.delete_extra_group(obj.id, obj.branch_id)
+
+    def delete_queryset(self, request, queryset):
+        from menu.services.extra_group_bll import ExtraGroupBusinessLogicLayer
+
+        for obj in queryset:
+            ExtraGroupBusinessLogicLayer.delete_extra_group(obj.id, obj.branch_id)
+
+    @admin.action(description="Remove or deactivate selected extra groups")
+    def remove_or_deactivate_extra_groups(self, request, queryset):
+        self.delete_queryset(request, queryset)
