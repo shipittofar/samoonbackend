@@ -442,12 +442,21 @@ STORAGES = {
 }
 
 # Direct-to-object-storage uploads (Arvan S3-compatible).
-# Browser PUT requires bucket CORS for the frontend origin, for example:
-#   AllowedOrigins: CORS_ALLOWED_ORIGINS
-#   AllowedMethods: PUT, GET, HEAD
-#   AllowedHeaders: Content-Type, Authorization
-#   ExposeHeaders: ETag
-# Originals use UUID keys under tenants/{id}/assets/{asset_id}/.
+# Browser PUT requires **bucket** CORS on Arvan (not django-cors-headers).
+# Apply/re-apply with: docker compose exec web python scripts/apply_arvan_bucket_cors.py
+#
+# Required CORS (verified 2026-09-22 against bucket samoon):
+#   AllowedOrigins: CORS_ALLOWED_ORIGINS (must include http://localhost:3000)
+#   AllowedMethods: GET, PUT, POST, DELETE, HEAD
+#     (OPTIONS preflight is answered automatically when CORS exists)
+#   AllowedHeaders: *
+#   ExposeHeaders: ETag, Content-Type, Content-Length, x-amz-request-id
+#   MaxAgeSeconds: 3600
+#
+# Bucket-level APIs (Get/PutBucketCors) must use the regional endpoint
+#   https://s3.ir-thr-at1.arvanstorage.ir
+# not the virtual-host object endpoint below.
+# Originals use UUID keys under tenants/{id}/assets/{asset_id}/ or users/... .
 # Storefront currently still reads public object URLs (AWS_DEFAULT_ACL=public-read).
 # Treat that as an explicit storefront policy, not an accidental default.
 # Do not put ARVAN_* secrets in frontend code.
