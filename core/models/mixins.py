@@ -23,8 +23,10 @@ class WebPImageMixin(models.Model):
             file = getattr(self, field.name)
             if not file:
                 continue
-            inner = getattr(file, "file", None)
-            if getattr(file, "_committed", True) and not isinstance(inner, UploadedFile):
+            # FieldFile.file opens storage. Read the already-bound file only.
+            # Committed storage keys have no UploadedFile and must not be opened.
+            inner = getattr(file, "_file", None)
+            if not isinstance(inner, UploadedFile):
                 continue
             process_image_to_webp(file)
         super().save(*args, **kwargs)
