@@ -173,8 +173,18 @@ def assert_purpose_authorized(
             raise BranchNotFoundException()
 
     if policy.authz == "branch_settings":
+        # Branch create uploads the image before the branch row exists.
+        # Tenant owners / settings.edit may hold an unattached branch_* asset.
+        # A supplied branch keeps the previous rule (owner, settings.edit, or manager).
         if branch is None:
-            raise UploadValidationException("entity_id (branch) is required for this purpose.")
+            if user_can_settings_edit(user, tenant.id):
+                return tenant
+            # A manager of this tenant must name their branch. Everyone else is denied.
+            if Branch.objects.filter(tenant_id=tenant.id, manager_id=user.id).exists():
+                raise UploadValidationException(
+                    "entity_id (branch) is required for this purpose."
+                )
+            _deny()
         if user_can_settings_edit(user, tenant.id):
             return branch
         if branch.manager_id == user.id:

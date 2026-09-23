@@ -821,22 +821,8 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
                 tenant_id=None,
             )
 
-    def test_branch_media_still_requires_branch_entity(self):
+    def test_branch_media_with_branch_entity_still_ok(self):
         self.client.force_authenticate(user=self.owner)
-        response = self.client.post(
-            "/api/uploads/initiate/",
-            {
-                "purpose": "branch_hero",
-                "filename": "hero.jpg",
-                "mime_type": "image/jpeg",
-                "byte_size": len(_png()),
-                "tenant_id": str(self.tenant.id),
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("entity_id (branch) is required", str(response.data))
-
         ok = self.client.post(
             "/api/uploads/initiate/",
             {
@@ -851,3 +837,156 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
             format="json",
         )
         self.assertEqual(ok.status_code, status.HTTP_201_CREATED, ok.data)
+
+
+CREATE_BRANCH_URL = "/api/branches/console-branches/tenants/{tenant_id}/create/"
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
+class UnattachedBranchMediaTests(TestCase):
+    """branch_* uploads before a branch exists: tenant_id only."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.owner, self.tenant, self.branch = make_tenant()
+        self.other, self.other_tenant, _ = make_tenant()
+        self.manager = make_user()
+        self.branch.manager = self.manager
+        self.branch.save(update_fields=["manager"])
+
+    def _initiate(self, user, purpose, **extra):
+        client = APIClient()
+        client.force_authenticate(user=user)
+        payload = {
+            "purpose": purpose,
+            "filename": "img.png",
+            "mime_type": "image/png",
+            "byte_size": len(_png()),
+            "tenant_id": str(self.tenant.id),
+        }
+        payload.update(extra)
+        return client.post("/api/uploads/initiate/", payload, format="json")
+
+    def _ready(self, user, purpose):
+        response = self._initiate(user, purpose)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+        self.assertEqual(str(asset.tenant_id), str(self.tenant.id))
+        self.assertFalse(asset.entity_type)
+        self.assertFalse(asset.entity_id)
+        blob = _png()
+        save_bytes(
+            asset.storage_key,
+            SimpleUploadedFile("img.png", blob, content_type="image/png"),
+            content_type="image/png",
+        )
+        client = APIClient()
+        client.force_authenticate(user=user)
+        complete = client.post(f"/api/uploads/{asset.id}/complete/")
+        self.assertEqual(complete.status_code, status.HTTP_200_OK, complete.data)
+        self.assertEqual(complete.data["status"], UploadAssetStatus.READY)
+        asset.refresh_from_db()
+        return asset
+
+    def test_owner_initiates_unattached_branch_logo_cover_hero(self):
+        for purpose in ("branch_logo", "branch_cover", "branch_hero"):
+            response = self._initiate(self.owner, purpose)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+            asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+            self.assertEqual(asset.purpose, purpose)
+            self.assertEqual(str(asset.tenant_id), str(self.tenant.id))
+            self.assertEqual(asset.entity_type, "")
+            self.assertEqual(asset.entity_id, "")
+
+    def test_complete_unattached_branch_logo(self):
+        asset = self._ready(self.owner, "branch_logo")
+        self.assertEqual(asset.status, UploadAssetStatus.READY)
+        self.assertIsNotNone(asset.uploaded_at)
+
+    def test_branch_create_attaches_unattached_assets(self):
+        logo = self._ready(self.owner, "branch_logo")
+        cover = self._ready(self.owner, "branch_cover")
+        hero = self._ready(self.owner, "branch_hero")
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            CREATE_BRANCH_URL.format(tenant_id=self.tenant.id),
+            {
+                "name": "New",
+                "type": "physical",
+                "location": {"address": "a", "city": "c", "country": "x"},
+                "businessHours": [
+                    {"day": "Monday", "open": "09:00", "close": "22:00", "isClosed": False}
+                ],
+                "image_asset_id": str(logo.id),
+                "cover_image_asset_id": str(cover.id),
+                "hero_image_asset_id": str(hero.id),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        logo.refresh_from_db()
+        cover.refresh_from_db()
+        hero.refresh_from_db()
+        self.assertEqual(logo.status, UploadAssetStatus.ATTACHED)
+        self.assertEqual(cover.status, UploadAssetStatus.ATTACHED)
+        self.assertEqual(hero.status, UploadAssetStatus.ATTACHED)
+
+    def test_missing_tenant_id_rejected(self):
+        response = self._initiate(self.owner, "branch_logo", tenant_id=None)
+        # serializer drops null; service then requires tenant_id
+        self.assertIn(response.status_code, (status.HTTP_400_BAD_REQUEST,))
+
+    def test_cross_tenant_rejected(self):
+        response = self._initiate(
+            self.owner, "branch_logo", tenant_id=str(self.other_tenant.id)
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_existing_branch_entity_still_works(self):
+        response = self._initiate(
+            self.owner,
+            "branch_hero",
+            entity_type="branch",
+            entity_id=str(self.branch.id),
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        asset = UploadAsset.objects.get(pk=response.data["asset_id"])
+        self.assertEqual(asset.entity_id, str(self.branch.id))
+
+    def test_manager_without_settings_edit_cannot_initiate_unattached(self):
+        response = self._initiate(self.manager, "branch_logo")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("entity_id (branch) is required", str(response.data))
+
+    def test_manager_with_branch_id_can_initiate(self):
+        response = self._initiate(
+            self.manager,
+            "branch_cover",
+            entity_type="branch",
+            entity_id=str(self.branch.id),
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_purpose_mismatch_attach_fails(self):
+        logo = self._ready(self.owner, "branch_logo")
+        self.client.force_authenticate(user=self.owner)
+        response = self.client.post(
+            CREATE_BRANCH_URL.format(tenant_id=self.tenant.id),
+            {
+                "name": "Mismatch",
+                "type": "physical",
+                "location": {"address": "a", "city": "c", "country": "x"},
+                "businessHours": [
+                    {"day": "Monday", "open": "09:00", "close": "22:00", "isClosed": False}
+                ],
+                "hero_image_asset_id": str(logo.id),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("purpose", str(response.data).lower())
+
+    def test_menu_still_requires_branch(self):
+        response = self._initiate(self.owner, "menu_item")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("branch", str(response.data).lower())
