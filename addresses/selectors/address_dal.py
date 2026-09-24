@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import Max, Q, QuerySet
 from django.utils import timezone
 
 from addresses.models import Address
@@ -97,6 +97,12 @@ class AddressDataAccessLayer:
         if exclude_id:
             qs = qs.exclude(pk=exclude_id)
         return qs.exists()
+
+    @staticmethod
+    def allocate_legacy_id() -> int:
+        """Next integer id for the legacy /api/orders/addresses/ contract."""
+        current = Address.all_objects.aggregate(max_id=Max("legacy_id"))["max_id"] or 0
+        return int(current) + 1
 
     @staticmethod
     def create_address(**fields) -> Address:

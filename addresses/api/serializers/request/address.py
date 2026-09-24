@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from addresses.domain.address_type import AddressType
+from addresses.domain.address_type import AddressType, resolve_address_type
 from addresses.validators import validate_coordinates
 
 
@@ -73,7 +73,36 @@ class AddressWriteSerializer(serializers.Serializer):
     delivery_notes = serializers.CharField(required=False, allow_blank=True, default="")
     is_default = serializers.BooleanField(required=False, default=False)
 
+    # Checkout still posts the legacy address-book field names.
+    state = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    zip = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    lat = serializers.FloatField(required=False, allow_null=True)
+    lng = serializers.FloatField(required=False, allow_null=True)
+
+    def to_internal_value(self, data):
+        incoming = data.copy() if hasattr(data, "copy") else dict(data)
+        if not incoming.get("province") and incoming.get("state"):
+            incoming["province"] = incoming.get("state")
+        if not incoming.get("postal_code") and incoming.get("zip"):
+            incoming["postal_code"] = incoming.get("zip")
+        if incoming.get("latitude") in (None, "") and incoming.get("lat") not in (None, ""):
+            incoming["latitude"] = incoming.get("lat")
+        if incoming.get("longitude") in (None, "") and incoming.get("lng") not in (None, ""):
+            incoming["longitude"] = incoming.get("lng")
+        if not incoming.get("country"):
+            incoming["country"] = "US"
+        raw_type = incoming.get("address_type") or incoming.get("label")
+        if raw_type:
+            incoming["address_type"] = resolve_address_type(
+                raw_type, custom_label=incoming.get("custom_label") or ""
+            )
+        return super().to_internal_value(incoming)
+
     def validate(self, attrs):
+        attrs.pop("state", None)
+        attrs.pop("zip", None)
+        attrs.pop("lat", None)
+        attrs.pop("lng", None)
         validate_coordinates(attrs.get("latitude"), attrs.get("longitude"))
         if attrs.get("address_type") == AddressType.OTHER and not attrs.get("custom_label"):
             raise serializers.ValidationError(
@@ -83,6 +112,23 @@ class AddressWriteSerializer(serializers.Serializer):
 
 
 class AddressUpdateSerializer(AddressWriteSerializer):
+    def to_internal_value(self, data):
+        incoming = data.copy() if hasattr(data, "copy") else dict(data)
+        if not incoming.get("province") and incoming.get("state"):
+            incoming["province"] = incoming.get("state")
+        if not incoming.get("postal_code") and incoming.get("zip"):
+            incoming["postal_code"] = incoming.get("zip")
+        if incoming.get("latitude") in (None, "") and incoming.get("lat") not in (None, ""):
+            incoming["latitude"] = incoming.get("lat")
+        if incoming.get("longitude") in (None, "") and incoming.get("lng") not in (None, ""):
+            incoming["longitude"] = incoming.get("lng")
+        raw_type = incoming.get("address_type") or incoming.get("label")
+        if raw_type:
+            incoming["address_type"] = resolve_address_type(
+                raw_type, custom_label=incoming.get("custom_label") or ""
+            )
+        return serializers.Serializer.to_internal_value(self, incoming)
+
     address_type = serializers.ChoiceField(choices=AddressType.choices, required=False)
     custom_label = serializers.CharField(max_length=100, required=False, allow_blank=True)
     country = serializers.CharField(max_length=2, required=False)

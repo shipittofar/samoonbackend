@@ -29,3 +29,9 @@ class AddressPermissionDeniedException(BaseAppException):
     status_code = 403
     code = "address_permission_denied"
     message = "You do not have permission to access this address."
+
+
+class AddressPersistenceException(BaseAppException):
+    status_code = 500
+    code = "address_persist_failed"
+    message = "The address could not be saved."

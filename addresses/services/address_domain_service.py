@@ -4,7 +4,7 @@ import hashlib
 from typing import Any
 from uuid import UUID
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -41,6 +41,7 @@ from core.exceptions.address import (
     AddressLimitExceededException,
     AddressNotFoundException,
     AddressNotServiceableException,
+    AddressPersistenceException,
     DuplicateAddressException,
 )
 
@@ -327,7 +328,7 @@ class AddressDomainService:
             validated["is_default"] = True
             self.dal.unset_default_addresses(user.id)
 
-        address = self.dal.create_address(user=user, **self._model_fields(validated))
+        address = self._persist_new_address(user, validated)
         self.audit.log(
             address_id=address.id,
             user_id=user.id,
@@ -588,6 +589,30 @@ class AddressDomainService:
             "street", "building_number", "unit", "floor", "postal_code", "latitude",
             "longitude", "delivery_notes", "is_default", "formatted_address", "fingerprint",
         )
+
+    def _persist_new_address(self, user, validated: dict[str, Any]) -> Address:
+        """Insert the address, assigning a unique legacy integer id.
+
+        Checkout still reads `id` from /api/orders/addresses/. That value is
+        `legacy_id`. Without one, every new address serializes as id 0.
+        """
+        fields = self._model_fields(validated)
+        last_error: IntegrityError | None = None
+        for _ in range(3):
+            fields["legacy_id"] = self.dal.allocate_legacy_id()
+            try:
+                with transaction.atomic():
+                    return self.dal.create_address(user=user, **fields)
+            except IntegrityError as exc:
+                last_error = exc
+                message = str(exc)
+                if "unique_active_address_fingerprint" in message:
+                    raise DuplicateAddressException() from exc
+                if "unique_active_default_address" in message:
+                    raise DuplicateAddressException() from exc
+                if "legacy_id" not in message and "user_address_legacy_id" not in message:
+                    raise AddressPersistenceException() from exc
+        raise AddressPersistenceException() from last_error
 
     @staticmethod
     def _model_fields(data: dict[str, Any]) -> dict[str, Any]:
