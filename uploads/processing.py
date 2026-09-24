@@ -8,7 +8,7 @@ from django.core.files.base import ContentFile
 
 from uploads.keys import variant_storage_key
 from uploads.object_store import open_object, save_bytes
-from uploads.purposes import MEDIUM_MAX, THUMBNAIL_MAX, WEBP_QUALITY
+from uploads.purposes import MEDIUM_MAX, THUMBNAIL_MAX, WEBP_QUALITY, get_purpose
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +64,11 @@ def process_asset_image(asset, *, max_dimension: int) -> dict:
         img = decode_image(fh, expected_mime=asset.mime_type)
 
     variants = {}
+    public = get_purpose(asset.purpose).public_object
     for name, cap in VARIANT_SPECS:
         dim = cap if cap is not None else max_dimension
         payload = _to_webp_bytes(img, max_dimension=dim)
         key = variant_storage_key(asset.storage_key, name)
-        save_bytes(key, ContentFile(payload), content_type="image/webp")
+        save_bytes(key, ContentFile(payload), content_type="image/webp", public=public)
         variants[name] = key
     return variants

@@ -46,7 +46,12 @@ def ingest_uploaded_file(
         branch_id=branch_id,
     )
     uploaded_file.seek(0)
-    save_bytes(asset.storage_key, uploaded_file, content_type=mime_type)
+    save_bytes(
+        asset.storage_key,
+        uploaded_file,
+        content_type=mime_type,
+        public=policy.public_object,
+    )
     return complete_upload(asset_id=asset.id, user=user)
 
 

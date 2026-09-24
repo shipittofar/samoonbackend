@@ -31,6 +31,8 @@ class PurposePolicy:
     permission_slug: str | None
     # "self" | "tenant_settings" | "branch_settings" | "menu"
     authz: str
+    # Storefront images are fetched anonymously by Next.js. Private purposes must set this False.
+    public_object: bool = True
 
 
 _IMAGE_POLICY = dict(

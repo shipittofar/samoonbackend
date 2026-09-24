@@ -457,8 +457,10 @@ STORAGES = {
 #   https://s3.ir-thr-at1.arvanstorage.ir
 # not the virtual-host object endpoint below.
 # Originals use UUID keys under tenants/{id}/assets/{asset_id}/ or users/... .
-# Storefront currently still reads public object URLs (AWS_DEFAULT_ACL=public-read).
-# Treat that as an explicit storefront policy, not an accidental default.
+# Storefront images are anonymously readable. boto3 PutObject must pass
+# ACL=public-read (see uploads.object_store); AWS_DEFAULT_ACL is not applied
+# by those calls. Public URLs are path-style on the virtual-host endpoint:
+# {AWS_S3_ENDPOINT_URL}/{bucket}/{key}. Stripping the bucket path segment 403s.
 # Do not put ARVAN_* secrets in frontend code.
 UPLOADS_DIRECT = os.getenv("UPLOADS_DIRECT", "true").lower() in ("1", "true", "yes")
 UPLOADS_INTENT_TTL_HOURS = int(os.getenv("UPLOADS_INTENT_TTL_HOURS", "24"))

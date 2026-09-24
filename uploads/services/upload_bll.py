@@ -263,6 +263,7 @@ def initiate_upload(
                 key=existing.storage_key,
                 content_type=existing.mime_type,
                 expires_in=_presign_expires(),
+                public=policy.public_object,
             )
 
     stored_entity_type = entity_type or ""
@@ -319,12 +320,14 @@ def initiate_upload(
             key=existing.storage_key,
             content_type=existing.mime_type,
             expires_in=_presign_expires(),
+            public=get_purpose(existing.purpose).public_object,
         )
 
     upload = object_store.generate_presigned_put(
         key=asset.storage_key,
         content_type=mime_type,
         expires_in=_presign_expires(),
+        public=policy.public_object,
     )
     _log("upload_initiated", asset)
     return asset, upload

@@ -10,6 +10,10 @@ from uploads.keys import assert_safe_storage_key
 
 logger = logging.getLogger(__name__)
 
+# Arvan accepts canned ACL public-read on PutObject (verified 2026-09-24).
+# AWS_DEFAULT_ACL is not applied by these boto3 calls.
+_PUBLIC_READ_ACL = "public-read"
+
 
 def _s3_client():
     bucket = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
@@ -37,31 +41,43 @@ def _s3_client():
         return None, None
 
 
-def generate_presigned_put(*, key: str, content_type: str, expires_in: int) -> dict:
+def generate_presigned_put(
+    *,
+    key: str,
+    content_type: str,
+    expires_in: int,
+    public: bool = False,
+) -> dict:
     key = assert_safe_storage_key(key)
+    headers = {"Content-Type": content_type}
+    if public:
+        headers["x-amz-acl"] = _PUBLIC_READ_ACL
     client, bucket = _s3_client()
     if client is None:
         dummy = getattr(settings, "UPLOADS_DUMMY_PRESIGN_BASE", "https://upload.invalid")
         return {
             "method": "PUT",
             "url": f"{dummy}/{key}",
-            "headers": {"Content-Type": content_type},
+            "headers": headers,
             "expires_in": expires_in,
         }
+    params = {
+        "Bucket": bucket,
+        "Key": key,
+        "ContentType": content_type,
+    }
+    if public:
+        params["ACL"] = _PUBLIC_READ_ACL
     url = client.generate_presigned_url(
         "put_object",
-        Params={
-            "Bucket": bucket,
-            "Key": key,
-            "ContentType": content_type,
-        },
+        Params=params,
         ExpiresIn=expires_in,
         HttpMethod="PUT",
     )
     return {
         "method": "PUT",
         "url": url,
-        "headers": {"Content-Type": content_type},
+        "headers": headers,
         "expires_in": expires_in,
     }
 
@@ -103,7 +119,7 @@ def open_object(key: str):
     return default_storage.open(key, "rb")
 
 
-def save_bytes(key: str, content, content_type: str | None = None):
+def save_bytes(key: str, content, content_type: str | None = None, *, public: bool = False):
     """
     Persist bytes at the canonical storage key.
 
@@ -133,6 +149,8 @@ def save_bytes(key: str, content, content_type: str | None = None):
         params = {"Bucket": bucket, "Key": key, "Body": body}
         if resolved_type:
             params["ContentType"] = resolved_type
+        if public:
+            params["ACL"] = _PUBLIC_READ_ACL
         client.put_object(**params)
         return key
 
