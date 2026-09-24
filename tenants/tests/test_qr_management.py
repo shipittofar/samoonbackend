@@ -295,6 +295,77 @@ class MenuQrManagementAPITests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    def test_unauthenticated_enable_rejected(self):
+        self.client.post(f"{self.url}disable/")
+        response = APIClient().post(f"{self.url}enable/")
+        self.assertEqual(response.status_code, 401)
+        self.qr.refresh_from_db()
+        self.assertFalse(self.qr.is_active)
+
+    def test_enable_persists_active_state(self):
+        self.client.post(f"{self.url}disable/")
+        response = self.client.post(f"{self.url}enable/", {}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.qr.refresh_from_db()
+        self.assertTrue(self.qr.is_active)
+        self.assertEqual(self.qr.entity_type, QrEntityType.MENU)
+        self.assertEqual(self.qr.entity_id, self.branch.id)
+        self.assertEqual(
+            QrCode.objects.filter(
+                entity_type=QrEntityType.MENU,
+                entity_id=self.branch.id,
+                is_active=True,
+            ).count(),
+            1,
+        )
+
+    def test_enable_ignores_unrecognized_body(self):
+        """Enable takes no fields; extra JSON must not become a 500."""
+        self.client.post(f"{self.url}disable/")
+        response = self.client.post(
+            f"{self.url}enable/",
+            {"is_active": "yes", "tenant_id": "not-a-uuid"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_active"])
+
+    def test_missing_branch_returns_not_found(self):
+        import uuid
+
+        response = self.client.post(
+            f"/api/menu/branches/{uuid.uuid4()}/qr/enable/"
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["error"]["code"], "branch_not_found")
+
+    def test_non_uuid_branch_is_not_routed(self):
+        response = self.client.post("/api/menu/branches/not-a-branch/qr/enable/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_other_tenant_header_does_not_grant_access(self):
+        self.client.post(f"{self.url}disable/")
+        self.other.credentials(HTTP_X_TENANT_SLUG=self.tenant.slug)
+        response = self.other.post(f"{self.url}enable/")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["error"]["code"], "unauthorized_qr_access")
+        self.qr.refresh_from_db()
+        self.assertFalse(self.qr.is_active)
+
+    def test_owner_does_not_require_tenant_header(self):
+        self.client.post(f"{self.url}disable/")
+        response = self.client.post(f"{self.url}enable/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["is_active"])
+
+    def test_menu_category_list_still_works_after_enable(self):
+        self.client.post(f"{self.url}disable/")
+        self.client.post(f"{self.url}enable/")
+        response = self.client.get(
+            f"/api/menu/categories/{self.branch.id}/"
+        )
+        self.assertEqual(response.status_code, 200)
+
 
 @override_settings(PUBLIC_SITE_URL="http://frontend.test")
 class ReservationQrManagementAPITests(TestCase):

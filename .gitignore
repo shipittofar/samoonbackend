@@ -201,3 +201,5 @@ frontend_helper.md
 SmartRestaurant/backend.code-workspace
 celerybeat-schedule-shm
 celerybeat-schedule-wal
+celerybeat-schedule-wal
+celerybeat-schedule-shm
