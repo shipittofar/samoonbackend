@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import urllib.error
+import urllib.request
 
 import boto3
 from botocore.config import Config as BotoConfig
@@ -159,6 +161,33 @@ def save_bytes(key: str, content, content_type: str | None = None, *, public: bo
     if hasattr(default_storage, "_save"):
         return default_storage._save(key, content)
     return default_storage.save(key, content)
+
+
+def assert_anonymous_readable(key: str) -> None:
+    """Fail when a public storefront key is not anonymously fetchable.
+
+    Authenticated HEAD is not enough: Next.js loads ``default_storage.url(key)``
+    with no credentials. Skipped when S3 is not configured (local tests).
+    """
+    client, _bucket = _s3_client()
+    if client is None:
+        return
+    key = assert_safe_storage_key(key)
+    url = default_storage.url(key)
+    request = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status = getattr(response, "status", 200)
+            content_type = (response.headers.get("Content-Type") or "").split(";")[0].strip()
+            chunk = response.read(64)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"Anonymous GET {url} returned {exc.code}.") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Anonymous GET {url} failed.") from exc
+    if status != 200 or not chunk:
+        raise RuntimeError(f"Anonymous GET {url} returned status {status} with an empty body.")
+    if not content_type.startswith("image/"):
+        raise RuntimeError(f"Anonymous GET {url} returned Content-Type {content_type!r}.")
 
 
 def delete_object(key: str) -> None:

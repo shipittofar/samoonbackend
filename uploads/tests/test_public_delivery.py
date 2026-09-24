@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
 
-from uploads.object_store import generate_presigned_put, save_bytes
+from uploads.object_store import assert_anonymous_readable, generate_presigned_put, save_bytes
 from uploads.purposes import PURPOSE_REGISTRY
 
 
@@ -56,6 +56,41 @@ class PublicReadAclTests(SimpleTestCase):
         self.assertEqual(public_call.kwargs["Key"], _VARIANT)
         self.assertEqual(private_call.kwargs["ContentType"], "image/jpeg")
         self.assertNotIn("ACL", private_call.kwargs)
+
+    def test_anonymous_get_failure_is_not_treated_as_readable(self):
+        import urllib.error
+        from io import BytesIO
+
+        class _Resp:
+            status = 200
+            headers = {"Content-Type": "image/webp"}
+
+            def read(self, _n):
+                return b"RIFF"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        with patch("uploads.object_store._s3_client", return_value=(MagicMock(), "samoon")), patch(
+            "uploads.object_store.default_storage.url",
+            return_value="https://samoon.s3.ir-thr-at1.arvanstorage.ir/samoon/" + _VARIANT,
+        ), patch("uploads.object_store.urllib.request.urlopen", return_value=_Resp()):
+            assert_anonymous_readable(_VARIANT)
+
+        with patch("uploads.object_store._s3_client", return_value=(MagicMock(), "samoon")), patch(
+            "uploads.object_store.default_storage.url",
+            return_value="https://samoon.s3.ir-thr-at1.arvanstorage.ir/samoon/" + _VARIANT,
+        ), patch(
+            "uploads.object_store.urllib.request.urlopen",
+            side_effect=urllib.error.HTTPError(
+                "https://example", 403, "Forbidden", hdrs=None, fp=BytesIO(b"<Error>AccessDenied</Error>")
+            ),
+        ):
+            with self.assertRaises(RuntimeError):
+                assert_anonymous_readable(_VARIANT)
 
 
 class PublicUrlShapeTests(SimpleTestCase):

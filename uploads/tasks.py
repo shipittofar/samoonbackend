@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from uploads.keys import original_storage_key
 from uploads.models import UploadAsset
+from uploads.object_store import assert_anonymous_readable
 from uploads.processing import process_asset_image
 from uploads.purposes import get_purpose
 from uploads.state import UploadAssetStatus, can_transition
@@ -75,6 +76,11 @@ def process_upload_asset(self, asset_id: str):
         variants = {}
         if policy.require_image:
             variants = process_asset_image(asset, max_dimension=policy.max_dimension)
+        if policy.public_object:
+            assert_anonymous_readable(asset.storage_key)
+            optimized = (variants or {}).get("optimized")
+            if optimized:
+                assert_anonymous_readable(optimized)
         with transaction.atomic():
             asset = UploadAsset.objects.select_for_update().get(pk=asset_id)
             if asset.status != UploadAssetStatus.PROCESSING:

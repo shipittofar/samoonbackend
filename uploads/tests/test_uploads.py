@@ -81,6 +81,7 @@ class UploadApiTests(TestCase):
             asset.storage_key,
             SimpleUploadedFile("x.png", blob, content_type=asset.mime_type),
             content_type=asset.mime_type,
+            public=True,
         )
 
     def test_initiate_valid(self):
@@ -346,7 +347,7 @@ class UploadProcessingAndStateTests(TestCase):
             status=UploadAssetStatus.UPLOADED,
             expires_at=timezone.now() + timedelta(hours=24),
         )
-        save_bytes(asset.storage_key, ContentFile(blob), content_type="image/webp")
+        save_bytes(asset.storage_key, ContentFile(blob), content_type="image/webp", public=True)
         variants = process_asset_image(asset, max_dimension=1600)
         from uploads.object_store import open_object
 
@@ -378,6 +379,7 @@ class UploadProcessingAndStateTests(TestCase):
             asset.storage_key,
             SimpleUploadedFile("x.png", _png(), content_type="image/png"),
             content_type="image/png",
+            public=True,
         )
         client.post(f"/api/uploads/{asset_id}/complete/")
         other_user, other_tenant, _ = make_tenant()
@@ -420,6 +422,7 @@ class UploadHardeningTests(TestCase):
             asset.storage_key,
             SimpleUploadedFile("x.png", blob, content_type=asset.mime_type),
             content_type=asset.mime_type,
+            public=True,
         )
 
     def test_unauthenticated_initiate_denied(self):
@@ -608,7 +611,7 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
             format="json",
         )
         asset = UploadAsset.objects.get(pk=response.data["asset_id"])
-        save_bytes(asset.storage_key, SimpleUploadedFile("h.jpg", blob), content_type="image/jpeg")
+        save_bytes(asset.storage_key, SimpleUploadedFile("h.jpg", blob), content_type="image/jpeg", public=True)
         complete = self.client.post(f"/api/uploads/{asset.id}/complete/")
         self.assertEqual(complete.status_code, status.HTTP_200_OK, complete.data)
         self.assertEqual(complete.data["status"], UploadAssetStatus.READY)
@@ -771,6 +774,7 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
             asset.storage_key,
             SimpleUploadedFile("h.jpg", blob),
             content_type="image/jpeg",
+            public=True,
         )
 
         # Status/complete re-authorize from persisted platform context (not branch).
@@ -879,6 +883,7 @@ class UnattachedBranchMediaTests(TestCase):
             asset.storage_key,
             SimpleUploadedFile("img.png", blob, content_type="image/png"),
             content_type="image/png",
+            public=True,
         )
         client = APIClient()
         client.force_authenticate(user=user)

@@ -1,5 +1,5 @@
-# core/exceptions/menu.py
-from core.exceptions import BaseAppException
+# core/exceptions/item.py
+from core.exceptions.base import BaseAppException
 
 
 class MenuItemAlreadyExistsException(BaseAppException):
