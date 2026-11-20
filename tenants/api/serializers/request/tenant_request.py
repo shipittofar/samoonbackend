@@ -16,6 +16,7 @@ from tenants.checkout_config import (
     map_checkout_camel_to_snake,
     strip_operational_settings_keys,
 )
+from tenants.service_area import ServiceAreaError, validate_service_area
 from tenants.settings_cleanup import (
     TenantSettingsContractError,
     validate_tenant_settings_contract,
@@ -238,6 +239,10 @@ class BranchConsoleCreateSerializer(serializers.Serializer):
     maxCapacity = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     cuisines = serializers.ListField(child=serializers.CharField(), required=False, default=list)
     amenities = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    # Where the branch serves customers; null clears it (see tenants.service_area).
+    serviceArea = serializers.JSONField(required=False, allow_null=True)
+    # The owner confirmed the pin is exact. The stored value is always server time.
+    locationVerifiedAt = serializers.DateTimeField(required=False, allow_null=True)
     image = serializers.ImageField(required=False, allow_null=True)
     coverImage = serializers.ImageField(
         required=False, allow_null=True, source="cover_image",
@@ -248,6 +253,21 @@ class BranchConsoleCreateSerializer(serializers.Serializer):
     image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     cover_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
     hero_image_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_serviceArea(self, value):
+        try:
+            return validate_service_area(value)
+        except ServiceAreaError as exc:
+            raise serializers.ValidationError(str(exc))
+
+    @staticmethod
+    def _map_location_extras(attrs):
+        """camelCase API names → model field names (create and partial update)."""
+        if "serviceArea" in attrs:
+            attrs["service_area"] = attrs.pop("serviceArea")
+        if "locationVerifiedAt" in attrs:
+            attrs["location_verified_at"] = attrs.pop("locationVerifiedAt")
+        return attrs
 
     def validate_businessHours(self, value):
         days = [entry["day"] for entry in value]
@@ -286,6 +306,7 @@ class BranchConsoleCreateSerializer(serializers.Serializer):
         ]
 
         attrs["is_default"] = attrs.pop("isDefault", False)
+        self._map_location_extras(attrs)
 
         if attrs.get("settings") is not None:
             attrs["settings"] = strip_operational_settings_keys(attrs["settings"])
@@ -295,7 +316,7 @@ class BranchConsoleCreateSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         data = data.dict() if hasattr(data, "dict") else dict(data)
 
-        for field in ("settings", "businessHours", "location", "contact", "metadata"):
+        for field in ("settings", "businessHours", "location", "contact", "metadata", "serviceArea"):
             raw = data.get(field)
             if isinstance(raw, str):
                 try:
@@ -507,7 +528,7 @@ class BranchConsoleUpdateSerializer(BranchConsoleCreateSerializer):
 
     _JSON_STRING_FIELDS = (
         "settings", "businessHours", "location", "contact", "metadata", "checkout",
-        "cuisines", "amenities",
+        "cuisines", "amenities", "serviceArea",
     )
 
     def validate(self, attrs):
@@ -555,6 +576,8 @@ class BranchConsoleUpdateSerializer(BranchConsoleCreateSerializer):
 
         if "isDefault" in attrs:
             attrs["is_default"] = attrs.pop("isDefault")
+
+        self._map_location_extras(attrs)
 
         if attrs.get("settings") is not None:
             attrs["settings"] = strip_operational_settings_keys(attrs["settings"])

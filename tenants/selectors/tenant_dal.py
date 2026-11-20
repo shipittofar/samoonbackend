@@ -171,9 +171,30 @@ class TenantDataAccessLayer:
 
     @staticmethod
     def _refresh_discover_list_cache() -> list[TenantDiscoverDTO]:
+        # Imported here: menu depends on tenants models, not the other way round.
+        from menu.models import MenuCategory, MenuItem
+
         public_branches_qs = (
             BranchDataAccessLayer.public_visible_branches_queryset()
-            .prefetch_related("working_hours")
+            .prefetch_related(
+                "working_hours",
+                # Published AND orderable items only, popular first (the DTO
+                # dedupes and caps them). `objects` already hides soft-deleted rows.
+                Prefetch(
+                    "items",
+                    queryset=MenuItem.objects.filter(is_active=True, available=True)
+                    .order_by("-is_popular", "name")
+                    .only("id", "branch_id", "name", "is_popular"),
+                    to_attr="discover_items",
+                ),
+                Prefetch(
+                    "categories",
+                    queryset=MenuCategory.objects.order_by("name").only(
+                        "id", "branch_id", "name"
+                    ),
+                    to_attr="discover_categories",
+                ),
+            )
         )
         rows = list(
             annotate_qr_code(

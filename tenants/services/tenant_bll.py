@@ -1,7 +1,9 @@
 from django.db import transaction, IntegrityError
+from django.utils import timezone
 from rest_framework.exceptions import NotAuthenticated
 
 from tenants.models import Tenant, Branch, WorkingHour, TenantStatus
+from tenants.service_area import resolve_location_verified_at
 from tenants.services.tenant_activation import (
     enforce_tenant_activation_status,
     initial_tenant_status,
@@ -352,6 +354,15 @@ def _merge_extension_settings(existing: dict | None, incoming: dict | None) -> d
     return merged
 
 
+def _pin_moved(branch, data: dict) -> bool:
+    """True when this write changes the branch coordinates (a stored pin is only
+    meaningful for the position it was confirmed at)."""
+    for key in ("latitude", "longitude"):
+        if key in data and data[key] != getattr(branch, key):
+            return True
+    return False
+
+
 class BranchBusinessLogicLayer:
 
     @staticmethod
@@ -389,6 +400,15 @@ class BranchBusinessLogicLayer:
         working_hours_data = data.pop("working_hours", [])
         settings_data = data.pop("settings", None)
         data["settings"] = _merge_extension_settings(None, settings_data)
+        if "location_verified_at" in data:
+            # Never trust a client clock: a confirmation is stamped with server time.
+            data["location_verified_at"] = resolve_location_verified_at(
+                stored=None,
+                provided=True,
+                incoming=data["location_verified_at"],
+                coordinates_changed=False,
+                now=timezone.now(),
+            )
         media = _extract_media(data, BRANCH_MEDIA)
 
         had_lifecycle_branches = lifecycle_branches_exist(tenant.id)
@@ -449,8 +469,22 @@ class BranchBusinessLogicLayer:
         branch.city = data.get("city", "")
         branch.country = data.get("country", "")
         branch.postal_code = data.get("postal_code", "")
+        # Full-replace semantics: omitted coordinates become None, which is a move.
+        moved = (
+            data.get("latitude") != branch.latitude
+            or data.get("longitude") != branch.longitude
+        )
         branch.latitude = data.get("latitude")
         branch.longitude = data.get("longitude")
+        branch.location_verified_at = resolve_location_verified_at(
+            stored=branch.location_verified_at,
+            provided="location_verified_at" in data,
+            incoming=data.get("location_verified_at"),
+            coordinates_changed=moved,
+            now=timezone.now(),
+        )
+        if "service_area" in data:
+            branch.service_area = data["service_area"]
 
         media_fields = _apply_extracted_media(
             branch,
@@ -482,6 +516,7 @@ class BranchBusinessLogicLayer:
             "name", "type", "manager",
             "phone", "email", "website",
             "address", "city", "country", "postal_code", "latitude", "longitude",
+            "service_area", "location_verified_at",
             "image", "cover_image", "hero_image",
             "time_zone", "currency", "language",
             "settings", "metadata",
@@ -552,10 +587,28 @@ class BranchBusinessLogicLayer:
             "cuisines": "cuisines",
             "amenities": "amenities",
         }
+        # Decide before the coordinates are overwritten below.
+        pin_moved = _pin_moved(branch, data)
+
         for data_key, model_field in scalar_fields.items():
             if data_key in data:
                 setattr(branch, model_field, data[data_key])
                 update_fields.append(model_field)
+
+        if "service_area" in data:
+            branch.service_area = data["service_area"]
+            update_fields.append("service_area")
+
+        verified_at = resolve_location_verified_at(
+            stored=branch.location_verified_at,
+            provided="location_verified_at" in data,
+            incoming=data.get("location_verified_at"),
+            coordinates_changed=pin_moved,
+            now=timezone.now(),
+        )
+        if verified_at != branch.location_verified_at:
+            branch.location_verified_at = verified_at
+            update_fields.append("location_verified_at")
 
         checkout_updates = _apply_branch_checkout_fields(branch, data)
         update_fields.extend(checkout_updates)
@@ -602,7 +655,11 @@ class BranchBusinessLogicLayer:
         transaction.on_commit(
             lambda: branch_dal.invalidate_branch_cache(tenant_id, branch.id)
         )
-        return branch_dal.get_branch_by_id(branch_id, tenant_id=tenant_id)
+        # Respond from the database, not the read cache: the cache is only
+        # refreshed after this transaction commits, so a cached read here would
+        # return the branch as it was BEFORE this PATCH (e.g. a pin the owner
+        # just confirmed would still read as unverified).
+        return branch_dal.get_branch_by_id(branch_id)
 
     @staticmethod
     def get_branch(tenant_id: int, branch_id: int):

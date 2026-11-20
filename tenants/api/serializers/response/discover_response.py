@@ -19,6 +19,9 @@ class DiscoverBranchLocationResponseSerializer(serializers.Serializer):
     address = serializers.CharField(read_only=True)
     city = serializers.CharField(read_only=True)
     country = serializers.CharField(read_only=True)
+    # The branch pin. A business (tenant) has no location of its own.
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, allow_null=True, read_only=True)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6, allow_null=True, read_only=True)
 
 
 class DiscoverBranchResponseSerializer(serializers.Serializer):
@@ -33,6 +36,17 @@ class DiscoverBranchResponseSerializer(serializers.Serializer):
     openNow = serializers.SerializerMethodField()
     todayHours = serializers.SerializerMethodField()
     location = DiscoverBranchLocationResponseSerializer(source="*", read_only=True)
+    serviceArea = serializers.JSONField(source="service_area", read_only=True, allow_null=True)
+    locationVerifiedAt = serializers.DateTimeField(
+        source="location_verified_at", read_only=True, allow_null=True,
+    )
+    # Public menu text for "pizza near me" style item search (bounded per branch).
+    menuItemNames = serializers.ListField(
+        source="menu_item_names", child=serializers.CharField(), read_only=True,
+    )
+    menuCategoryNames = serializers.ListField(
+        source="menu_category_names", child=serializers.CharField(), read_only=True,
+    )
     qr = serializers.SerializerMethodField()
 
     def get_image(self, obj) -> str | None:

@@ -150,6 +150,12 @@ class BranchResponseSerializer(BranchCheckoutResponseMixin, serializers.Serializ
     status = serializers.SerializerMethodField()
     type = serializers.CharField(read_only=True)
     location = BranchLocationResponseSerializer(source="*", read_only=True)
+    # null = no custom area (clients fall back to delivery radius / business default)
+    serviceArea = serializers.JSONField(source="service_area", read_only=True, allow_null=True)
+    # server time of the owner's "pin is exact" confirmation; null = unverified
+    locationVerifiedAt = serializers.DateTimeField(
+        source="location_verified_at", read_only=True, allow_null=True,
+    )
     contact = BranchContactResponseSerializer(source="*", read_only=True)
     managerId = serializers.SerializerMethodField()
     businessHours = serializers.SerializerMethodField()

@@ -268,7 +268,7 @@ class BranchAdmin(admin.ModelAdmin):
         "manager__email",
     )
     autocomplete_fields = ("tenant", "manager")
-    readonly_fields = ("slug", "created_at", "updated_at")
+    readonly_fields = ("slug", "created_at", "updated_at", "location_verified_at")
     inlines = (WorkingHourInline,)
     fieldsets = (
         (None, {
@@ -279,7 +279,8 @@ class BranchAdmin(admin.ModelAdmin):
         }),
         (_("Contact"), {"fields": ("phone", "email", "website")}),
         (_("Location"), {"fields": ("address", "city",
-         "country", "postal_code", "latitude", "longitude")}),
+         "country", "postal_code", "latitude", "longitude",
+         "service_area", "location_verified_at")}),
         (_("Media"), {"fields": ("image", "cover_image", "hero_image")}),
         (_("Locale"), {"fields": ("time_zone", "currency", "language")}),
         (_("Checkout"), {

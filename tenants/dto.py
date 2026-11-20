@@ -208,6 +208,9 @@ class BranchDTO:
     updated_at: datetime
     working_hours: list[WorkingHourDTO] = field(default_factory=list)
     qr_code: str | None = None
+    # Defaults keep entries cached before these fields existed loadable.
+    service_area: dict | None = None
+    location_verified_at: datetime | None = None
 
     @classmethod
     def from_model(cls, branch) -> BranchDTO:
@@ -282,6 +285,8 @@ class BranchDTO:
             updated_at=branch.updated_at,
             working_hours=hours,
             qr_code=_qr_code_value(branch),
+            service_area=branch.service_area,
+            location_verified_at=branch.location_verified_at,
         )
 
     def to_cache_dict(self) -> dict[str, Any]:
@@ -342,9 +347,28 @@ class BranchDiscoverDTO:
     amenities: list = field(default_factory=list)
     working_hours: list[WorkingHourDTO] = field(default_factory=list)
     qr_code: str | None = None
+    # Location / nearby search (defaults keep older cached entries loadable).
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+    service_area: dict | None = None
+    location_verified_at: datetime | None = None
+    # Public menu text for item search ("pizza near me"). Bounded, see
+    # tenants.service_area.MAX_MENU_NAMES_PER_BRANCH.
+    menu_item_names: list = field(default_factory=list)
+    menu_category_names: list = field(default_factory=list)
 
     @classmethod
     def from_model(cls, branch) -> BranchDiscoverDTO:
+        from tenants.service_area import MAX_MENU_NAMES_PER_BRANCH
+
+        def _names(rows) -> list[str]:
+            seen: dict[str, None] = {}
+            for row in rows:
+                name = (getattr(row, "name", "") or "").strip()
+                if name:
+                    seen.setdefault(name, None)
+            return list(seen)
+
         return cls(
             id=branch.id,
             tenant_id=branch.tenant_id,
@@ -372,6 +396,16 @@ class BranchDiscoverDTO:
                 WorkingHourDTO.from_model(wh) for wh in branch.working_hours.all()
             ],
             qr_code=_qr_code_value(branch),
+            latitude=branch.latitude,
+            longitude=branch.longitude,
+            service_area=branch.service_area,
+            location_verified_at=branch.location_verified_at,
+            # Prefetched by TenantDataAccessLayer._refresh_discover_list_cache
+            # (published, orderable items; popular first). Absent → empty.
+            menu_item_names=_names(
+                getattr(branch, "discover_items", [])
+            )[:MAX_MENU_NAMES_PER_BRANCH],
+            menu_category_names=_names(getattr(branch, "discover_categories", [])),
         )
 
     def to_cache_dict(self) -> dict[str, Any]:

@@ -197,6 +197,13 @@ class Branch(WebPImageMixin, models.Model):
         max_digits=9, decimal_places=6, null=True, blank=True,
         validators=[MinValueValidator(-180), MaxValueValidator(180)],
     )
+    # Custom service area (delivery / on-site / visit-only; circle or polygon).
+    # None = use the delivery radius, then the business-type default.
+    # Shape and rules: tenants.service_area.
+    service_area = models.JSONField(null=True, blank=True, default=None)
+    # When the owner confirmed the map pin is exact. Always server time; reset to
+    # None when the pin moves (tenants.service_area.resolve_location_verified_at).
+    location_verified_at = models.DateTimeField(null=True, blank=True)
 
     # --- media ---
     image = models.ImageField(

@@ -206,12 +206,21 @@ class PublicDiscoverListTests(TestCase):
                 "openNow",
                 "todayHours",
                 "location",
+                # Location / nearby search: the branch pin's service area and
+                # verification, plus public menu text for item search.
+                "serviceArea",
+                "locationVerifiedAt",
+                "menuItemNames",
+                "menuCategoryNames",
                 "qr",
             },
         )
         self.assertEqual(branch["cuisines"], ["Italian"])
         self.assertEqual(branch["amenities"], ["WiFi"])
-        self.assertEqual(set(branch["location"].keys()), {"address", "city", "country"})
+        self.assertEqual(
+            set(branch["location"].keys()),
+            {"address", "city", "country", "latitude", "longitude"},
+        )
 
     def test_discover_tenant_description_comes_from_tenant_not_branch(self):
         tenant = make_tenant(description="Our business description")
@@ -442,8 +451,10 @@ class PublicDiscoverListTests(TestCase):
 
         cache.clear()
 
-        # 1 tenants + 1 batched branches + 1 batched working_hours (no N+1).
-        with self.assertNumQueries(3):
+        # 1 tenants + 1 batched branches + 1 batched working_hours, plus one
+        # batched query each for menu items and menu categories (the public menu
+        # text used for item search). Constant — never per branch (no N+1).
+        with self.assertNumQueries(5):
             list(TenantDataAccessLayer.get_discover_tenants())
 
         response = self.client.get(DISCOVER_URL)

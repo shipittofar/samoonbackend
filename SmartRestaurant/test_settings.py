@@ -1,7 +1,12 @@
 """Test runner settings — SQLite in-memory DB, local memory cache, local files."""
+import os
 import tempfile
 
-from SmartRestaurant.settings import *  # noqa: F403
+# The production settings refuse to start with DEBUG off and no secret key.
+# Tests run in debug mode so they need no environment setup.
+os.environ.setdefault("DJANGO_DEBUG", "True")
+
+from SmartRestaurant.settings import *  # noqa: E402, F403
 
 DATABASES = {
     "default": {
