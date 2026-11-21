@@ -1,6 +1,7 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from accounts.models import User, OTPCode
+from accounts.services import superuser_bll
 from accounts.services.profile_bll import ProfileBusinessLogicLayer
 from core.exceptions.account import AccountAlreadyDeletedException
 
@@ -9,13 +10,15 @@ from core.exceptions.account import AccountAlreadyDeletedException
 class UserAdmin(BaseUserAdmin):
     list_display = [
         "phone_number", "email", "full_name", "role",
-        "is_verified", "is_active", "is_staff", "created_at",
+        "is_verified", "is_active", "is_superuser", "created_at",
     ]
-    list_filter = ["is_active", "is_staff", "is_verified", "role"]
+    list_filter = ["is_active", "is_superuser", "is_verified", "role"]
     search_fields = ["phone_number", "email", "first_name", "last_name"]
     ordering = ["-created_at"]
-    readonly_fields = ["id", "created_at", "updated_at"]
-    actions = ["soft_delete_selected_users"]
+    # Superuser status changes only through Superuser requests (approve) and
+    # the "Revoke superuser" action, so every change is checked and recorded.
+    readonly_fields = ["id", "is_superuser", "is_staff", "created_at", "updated_at"]
+    actions = ["soft_delete_selected_users", "revoke_superuser"]
 
     def get_queryset(self, request):
         return User.all_objects.all()
@@ -30,6 +33,18 @@ class UserAdmin(BaseUserAdmin):
                 ProfileBusinessLogicLayer.soft_delete(user)
             except AccountAlreadyDeletedException:
                 continue
+
+    @admin.action(description="Revoke superuser (and Django admin access)")
+    def revoke_superuser(self, request, queryset):
+        done = 0
+        for user in queryset.filter(is_superuser=True):
+            try:
+                superuser_bll.revoke(user, actor=request.user)
+                done += 1
+            except superuser_bll.SuperuserError as exc:
+                self.message_user(request, f"{user}: {exc}", messages.ERROR)
+        if done:
+            self.message_user(request, f"Revoked superuser from {done} account(s).", messages.SUCCESS)
 
     fieldsets = (
         (None, {"fields": ("id", "country_code", "phone_number", "email", "password")}),

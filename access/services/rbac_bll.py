@@ -6,6 +6,7 @@ from access.authorization.admin_role_protection import (
     PROTECTED_ADMIN_SLUG,
     viewer_may_see_admin_role,
 )
+from access.authorization.platform import is_platform_superuser
 from access.constants import MembershipStatus, SystemRoleSlug
 from access.constants.rbac_cache import (
     PERMISSIONS_CATALOG_CACHE_KEY,
@@ -13,7 +14,14 @@ from access.constants.rbac_cache import (
 )
 from access.services.cache_utils import safe_cache_delete, safe_cache_get, safe_cache_set
 from access.constants.tenant_eligibility import is_tenant_rbac_eligible
-from access.models import PermissionOverride, Role, RolePermission, StaffAssignment, StaffMembership
+from access.models import (
+    Permission,
+    PermissionOverride,
+    Role,
+    RolePermission,
+    StaffAssignment,
+    StaffMembership,
+)
 from access.selectors import membership_selector, permission_selector, role_selector
 from access.services.assignment_scope import (
     filter_assignments_for_authorization,
@@ -57,6 +65,15 @@ class RbacBusinessLogicLayer:
         branch_id=None,
         use_cache: bool = True,
     ) -> dict:
+        if is_platform_superuser(user):
+            # Platform superusers hold every permission in every tenant.
+            every = sorted(Permission.objects.values_list("slug", flat=True))
+            return {
+                "permissions": every,
+                "inherited_permissions": every,
+                "overrides": [],
+            }
+
         tenant = self._ensure_tenant_with_owner(tenant)
         if not self.is_tenant_rbac_eligible(tenant):
             return {
@@ -294,6 +311,8 @@ class RbacBusinessLogicLayer:
         return tenant
 
     def assert_tenant_member(self, *, user, tenant) -> None:
+        if is_platform_superuser(user):
+            return
         tenant = self._ensure_tenant_with_owner(tenant)
         if not self.is_tenant_rbac_eligible(tenant):
             raise TenantAccessDeniedException(

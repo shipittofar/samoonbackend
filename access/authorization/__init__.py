@@ -5,6 +5,7 @@ from .console_workspace import (
     authorize_console_branch,
     user_has_console_permissions,
 )
+from .platform import is_platform_superuser
 from .tenant_access import (
     BaseTenantPermission,
     RequirePermission,
@@ -34,6 +35,7 @@ __all__ = [
     "BaseTenantPermission",
     "RequirePermission",
     "TenantOwnerChecker",
+    "is_platform_superuser",
     "CanManageRoleDefinitions",
     "IsSuperuser",
     "user_can_manage_role_definitions",

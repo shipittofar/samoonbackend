@@ -565,7 +565,8 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
         self.other, self.other_tenant, _ = make_tenant()
         self.cms = make_user()
         self.cms.is_staff = True
-        self.cms.save(update_fields=["is_staff"])
+        self.cms.is_superuser = True
+        self.cms.save(update_fields=["is_staff", "is_superuser"])
 
     def _platform_payload(self, **overrides):
         payload = {
@@ -708,7 +709,8 @@ class PlatformHomepageWebsiteMediaTests(TestCase):
         ).data["asset_id"]
         other_cms = make_user()
         other_cms.is_staff = True
-        other_cms.save(update_fields=["is_staff"])
+        other_cms.is_superuser = True
+        other_cms.save(update_fields=["is_staff", "is_superuser"])
         other = APIClient()
         other.force_authenticate(user=other_cms)
         detail = other.get(f"/api/uploads/{asset_id}/")

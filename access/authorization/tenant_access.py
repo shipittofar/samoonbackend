@@ -3,6 +3,7 @@ from __future__ import annotations
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import BasePermission
 
+from access.authorization.platform import is_platform_superuser
 from access.constants.tenant_eligibility import is_tenant_rbac_eligible
 from access.selectors import permission_selector
 from core.exceptions import PermissionDeniedException, TenantAccessDeniedException
@@ -21,6 +22,10 @@ class TenantOwnerChecker:
     """
 
     def is_owner(self, *, user, tenant_id) -> bool:
+        """Owner-level access: the tenant's owner, or a platform superuser
+        (who has owner-level access to every tenant)."""
+        if is_platform_superuser(user):
+            return True
         from tenants.models import Tenant
 
         return Tenant.objects.filter(id=tenant_id, owner__user_id=user.id).exists()
@@ -40,6 +45,9 @@ class BaseTenantPermission(BasePermission):
             return False
 
         tenant_id = self._get_tenant_id(view)
+        if is_platform_superuser(request.user):
+            # Every permission in every tenant, whatever its status.
+            return True
         branch_id = self._get_branch_id(view)
 
         tenant = Tenant.objects.filter(id=tenant_id).first()

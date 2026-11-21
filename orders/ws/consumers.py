@@ -1,6 +1,7 @@
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
+from access.authorization.platform import is_platform_superuser
 from orders.models import Order
 
 
@@ -51,4 +52,4 @@ class OrderStatusConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def _can_access(self, order, user) -> bool:
-        return order.customer_id == user.id or user.is_staff
+        return order.customer_id == user.id or is_platform_superuser(user)

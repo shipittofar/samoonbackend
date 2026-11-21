@@ -23,6 +23,14 @@ class UserManager(BaseUserManager):
         return user
 
     def create_superuser(self, phone_number: str, password: str, **extra_fields):
+        """Used by Django's ``createsuperuser``. Only the very first superuser
+        may be made this way; later ones go through ``manage.py admin_add`` and
+        need a superuser's approval in the Django admin."""
+        if self.model.objects.filter(is_superuser=True, is_active=True).exists():
+            raise ValueError(
+                "A superuser already exists. Use `manage.py admin_add` "
+                "(`samoon admin-add` on the server): new superusers need approval."
+            )
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         user = self.model(phone_number=phone_number, **extra_fields)

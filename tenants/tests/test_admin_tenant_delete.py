@@ -229,7 +229,9 @@ class TenantAdminDeleteTests(TestCase):
         self.assertEqual(self.tenant.status, TenantStatus.ACTIVE)
 
     def test_delete_allowed_without_delete_staffassignment_permission(self):
-        limited = _make_user(is_superuser=False, is_staff=True)
+        # The Django admin is for superusers only; the point here is that the
+        # action does not need delete permission on staff assignments.
+        limited = _make_user(is_superuser=True, is_staff=True)
         perms = Permission.objects.filter(
             content_type__app_label="tenants",
             codename__in=["view_tenant", "change_tenant"],

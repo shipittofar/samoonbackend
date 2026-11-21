@@ -67,12 +67,11 @@ class AdminRoleExposureTests(TestCase):
             return data["results"]
         return data
 
-    def test_global_role_list_hides_admin_for_platform_staff(self):
+    def test_global_role_list_is_closed_to_platform_staff(self):
+        # is_staff (Django admin only) grants no role management.
         self.client.force_authenticate(user=self.platform_staff)
         response = self.client.get("/api/authorization/roles/")
-        self.assertEqual(response.status_code, 200)
-        slugs = {item["slug"] for item in self._role_items(response)}
-        self.assertNotIn("admin", slugs)
+        self.assertEqual(response.status_code, 403)
 
     def test_global_role_list_includes_admin_for_superuser(self):
         self.client.force_authenticate(user=self.superuser)
@@ -81,12 +80,12 @@ class AdminRoleExposureTests(TestCase):
         slugs = {item["slug"] for item in self._role_items(response)}
         self.assertIn("admin", slugs)
 
-    def test_global_role_detail_admin_returns_404_for_platform_staff(self):
+    def test_global_role_detail_admin_is_closed_to_platform_staff(self):
         self.client.force_authenticate(user=self.platform_staff)
         response = self.client.get(
             f"/api/authorization/roles/{self.admin_role.id}/"
         )
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 403)
 
     def test_global_role_detail_admin_visible_for_superuser(self):
         self.client.force_authenticate(user=self.superuser)
@@ -193,7 +192,8 @@ class AdminRoleExposureTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data["error"]["code"], "admin_role_access_denied")
+        from access.models import Role
+        self.assertFalse(Role.objects.filter(name="Fake Admin").exists())
 
     def test_permission_audit_hides_admin_assignment_events_for_owner(self):
         permission_audit_bll.record_assignment_created(
@@ -209,12 +209,12 @@ class AdminRoleExposureTests(TestCase):
             metadata = entry.get("metadata") or {}
             self.assertNotEqual(metadata.get("role_slug"), "admin")
 
-    def test_admin_role_permissions_endpoint_hidden_for_platform_staff(self):
+    def test_admin_role_permissions_endpoint_closed_to_platform_staff(self):
         self.client.force_authenticate(user=self.platform_staff)
         response = self.client.get(
             f"/api/authorization/roles/{self.admin_role.id}/permissions/"
         )
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 403)
 
     def test_admin_role_permissions_endpoint_available_for_superuser(self):
         self.client.force_authenticate(user=self.superuser)

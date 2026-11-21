@@ -20,6 +20,7 @@ from tenants.selectors import (
 )
 from tenants.selectors.tenant_availability import PUBLIC_TENANT_FILTER
 from accounts.selectors import UserDataAccessLayer
+from access.authorization.platform import is_platform_superuser
 from accounts.services.workspace_bll import workspace_bll
 from core.exceptions import (
     TenantNotFoundException,
@@ -105,7 +106,7 @@ user_dal = UserDataAccessLayer()
 
 def _assert_owns_tenant(user, tenant) -> None:
     """Ownership via flat ``owner_user_id`` only — no nested ORM relations."""
-    if user.is_staff:
+    if is_platform_superuser(user):
         return
     owner_user_id = getattr(tenant, "owner_user_id", None)
     if owner_user_id is None or owner_user_id != user.id:
@@ -322,7 +323,7 @@ class TenantBusinessLogicLayer:
 
 def _assert_owns_branch(user, branch) -> None:
     """Branch ownership via flat ``owner_user_id`` / ``tenant_id`` only."""
-    if user.is_staff:
+    if is_platform_superuser(user):
         return
     owner_user_id = getattr(branch, "owner_user_id", None)
     if owner_user_id is not None:

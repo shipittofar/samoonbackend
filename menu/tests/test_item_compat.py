@@ -213,6 +213,10 @@ class MenuItemVisibilityTests(TestCase):
         self.assertEqual(names, {self.unavailable_item.name})
 
     def test_console_list_includes_inactive_items(self):
+        anonymous = self.client.get(f"/api/menu/console-menu/items/{self.branch.id}/")
+        self.assertIn(anonymous.status_code, (401, 403))
+
+        self.client.force_authenticate(self.branch.tenant.owner.user)
         response = self.client.get(
             f"/api/menu/console-menu/items/{self.branch.id}/",
         )

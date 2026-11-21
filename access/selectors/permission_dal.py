@@ -55,13 +55,17 @@ class PermissionDataAccessLayer:
     def get_user_permission_slugs(self, *, user_id, tenant_id, branch_id=None) -> set[str]:
         """Internal DAL helper — prefer rbac_bll.get_effective_permissions() for resolution."""
         from accounts.models import User
-
-        tenant = Tenant.objects.filter(id=tenant_id).select_related("owner").first()
-        if tenant is None or not is_tenant_rbac_eligible(tenant):
-            return set()
+        from access.authorization.platform import is_platform_superuser
 
         user = User.objects.filter(id=user_id).first()
         if user is None:
+            return set()
+
+        tenant = Tenant.objects.filter(id=tenant_id).select_related("owner").first()
+        if tenant is None:
+            return set()
+        # Superusers hold every permission even in a closed/inactive tenant.
+        if not is_tenant_rbac_eligible(tenant) and not is_platform_superuser(user):
             return set()
 
         from access.services.rbac_bll import rbac_bll

@@ -44,12 +44,10 @@ def user_can_menu_manage(user, branch: Branch) -> bool:
 
 
 def user_can_platform_cms(user) -> bool:
-    """Platform CMS operators (homepage hero, etc.). Staff or superuser only."""
-    return bool(
-        user
-        and getattr(user, "is_authenticated", False)
-        and (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
-    )
+    """Platform CMS operators (homepage hero, etc.): platform superusers only."""
+    from access.authorization.platform import is_platform_superuser
+
+    return is_platform_superuser(user)
 
 
 def is_platform_homepage_media(
