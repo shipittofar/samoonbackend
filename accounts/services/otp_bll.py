@@ -82,8 +82,9 @@ class OTPBusinessLogiclayer:
             raise OTPInvalidException()
 
         otp.is_used = True
+        otp.verified_at = timezone.now()
         if commit_success:
-            otp.save(update_fields=["is_used"])
+            otp.save(update_fields=["is_used", "verified_at"])
         return otp
 
     @classmethod

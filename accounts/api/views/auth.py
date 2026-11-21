@@ -1,5 +1,6 @@
 from rest_framework import status, serializers
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.generics import (
@@ -48,6 +49,7 @@ from accounts.api.serializers.response import (
     AccountVerifyOutputSerializer,
     UserMeOutputSerializer,
 )
+from access.authorization import IsSuperuser
 from access.services.rbac_session_bll import rbac_session_bll
 from core.exceptions import (
     UserInactiveException,
@@ -74,6 +76,8 @@ account_verification_bll = AccountVerificationBusinessLogicLayer()
     description="Generate and send a one-time password to a phone number or email for login/signup.",
 )
 class SendOTPView(CreateAPIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_otp_send"
     serializer_class = SendOTPInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -92,6 +96,8 @@ class SendOTPView(CreateAPIView):
     description="Verify the sent OTP code. If no account exists for that identifier, a new account is created and tokens are issued.",
 )
 class VerifyOTPView(CreateAPIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_otp_verify"
     serializer_class = VerifyOTPInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -125,6 +131,8 @@ class VerifyOTPView(CreateAPIView):
                 "(whichever was verified via OTP) plus first_name/last_name.",
 )
 class RegisterUserView(CreateAPIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_register"
     serializer_class = RegisterInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -169,6 +177,8 @@ class LogoutView(CreateAPIView):
                 "Provide exactly one of email or phone_number.",
 )
 class PasswordLoginView(CreateAPIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_password_login"
     serializer_class = PasswordLoginInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -250,6 +260,8 @@ class ChangePasswordView(CreateAPIView):
     description="Send a verification code to the given phone number to recover a forgotten password.",
 )
 class ForgetPasswordRequestView(CreateAPIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_password_reset"
     serializer_class = ForgetPasswordRequestInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -265,6 +277,8 @@ class ForgetPasswordRequestView(CreateAPIView):
     description="Verify the sent code and set a new password.",
 )
 class ForgetPasswordConfirmView(CreateAPIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth_password_reset"
     serializer_class = ForgetPasswordConfirmInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -424,7 +438,8 @@ class VerifyAccountView(CreateAPIView):
 )
 class UserListView(ListAPIView):
     serializer_class = UserOutputSerializer
-    permission_classes = [IsAuthenticated]  # RBAC to be added later
+    # Every user's phone/email: platform administrators only.
+    permission_classes = [IsAuthenticated, IsSuperuser]
 
     def get_queryset(self):
         return user_bll.list_users()
@@ -437,7 +452,7 @@ class UserListView(ListAPIView):
 )
 class UserDetailView(RetrieveAPIView):
     serializer_class = UserOutputSerializer
-    permission_classes = [IsAuthenticated]  # RBAC to be added later
+    permission_classes = [IsAuthenticated, IsSuperuser]
     lookup_url_kwarg = "user_id"
 
     def get_object(self):

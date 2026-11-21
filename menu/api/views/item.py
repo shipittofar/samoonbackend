@@ -39,7 +39,11 @@ from menu.services.item_bll import (
     MenuItemExtraGroupBusinessLogicLayer,
 )
 from menu.services.menu_bll import MenuBusinessLogicLayer
-from menu.authorization.branch_menu import RequireBranchMenuManagePermission
+from menu.authorization.branch_menu import (
+    PublicReadBranchMenuWriteMixin,
+    RequireBranchMenuManagePermission,
+    RequireBranchMenuViewPermission,
+)
 from menu.api.views.tenant_summary import (
     MenuPublicTenantSummaryMixin,
     tenant_summary_for_branch,
@@ -262,6 +266,7 @@ class MenuItemBulkCreateView(CreateAPIView):
 
 @extend_schema(tags=["Menu - Items"], summary="list Menu Items for Console")
 class ConsoleMenuItemListView(ListAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuViewPermission]
     serializer_class = MenuItemOutputSerializer
     pagination_class = ItemPagination
 
@@ -559,6 +564,7 @@ class MenuItemDeleteView(DestroyAPIView):
     description="Create a new extra for the specified branch."
 )
 class ExtraCreateView(CreateAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     serializer_class = ExtraInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -617,6 +623,7 @@ class ExtraDetailView(RetrieveAPIView):
     description="Partially update an existing extra."
 )
 class ExtraUpdateView(UpdateAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     serializer_class = ExtraUpdateSerializer
     http_method_names = ["patch"]
 
@@ -648,6 +655,7 @@ class ExtraUpdateView(UpdateAPIView):
     )
 )
 class ExtraDeleteView(DestroyAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def destroy(self, request, *args, **kwargs):
         branch_id = kwargs.get(
@@ -664,7 +672,7 @@ class ExtraDeleteView(DestroyAPIView):
     summary="Extra collection (frontend alias)",
     description="GET list or POST create via /extras/.",
 )
-class ExtraCollectionAliasView(APIView):
+class ExtraCollectionAliasView(PublicReadBranchMenuWriteMixin, APIView):
     def get(self, request, *args, **kwargs):
         branch_id = request.query_params.get("branch_id")
         group_id = request.query_params.get("group_id")
@@ -690,7 +698,7 @@ class ExtraCollectionAliasView(APIView):
     summary="Extra detail (frontend alias)",
     description="GET, PATCH, or DELETE via /extras/{id}/.",
 )
-class ExtraDetailAliasView(APIView):
+class ExtraDetailAliasView(PublicReadBranchMenuWriteMixin, APIView):
     def get(self, request, *args, **kwargs):
         branch_id = request.query_params.get("branch_id")
         extra = extra_bll.get_extra_detail(
@@ -732,6 +740,7 @@ class ExtraDetailAliasView(APIView):
     ),
 )
 class MenuItemAssignExtraGroupsView(UpdateAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     serializer_class = MenuItemAssignExtraGroupsSerializer
     http_method_names = ["patch"]
 
@@ -763,6 +772,7 @@ class MenuItemAssignExtraGroupsView(UpdateAPIView):
     description="Attach an existing extra to a menu item."
 )
 class MenuItemExtraCreateView(CreateAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     serializer_class = MenuItemExtraInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -802,6 +812,7 @@ class MenuItemExtraListView(ListAPIView):
     description="Update the price override or settings for an extra assigned to a menu item."
 )
 class MenuItemExtraUpdateView(UpdateAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     serializer_class = MenuItemExtraUpdateSerializer
     http_method_names = ["patch"]
 
@@ -829,6 +840,7 @@ class MenuItemExtraUpdateView(UpdateAPIView):
     description="Remove an extra from a menu item."
 )
 class MenuItemExtraDeleteView(DestroyAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def destroy(self, request, *args, **kwargs):
         item_extra_bll.delete_item_extra(

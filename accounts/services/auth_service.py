@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from django.db import IntegrityError, transaction
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from accounts.models import User, OTPType
@@ -17,6 +20,11 @@ from accounts.services import OTPBusinessLogiclayer
 user_dal = UserDataAccessLayer()
 otp_bll = OTPBusinessLogiclayer()
 
+# Sign-up must follow a successful OTP verification of the same identifier
+# within this window; each verification can create one account only.
+REGISTRATION_WINDOW = timedelta(minutes=15)
+
+
 class AuthBusinessLogicLayer:
 
     @staticmethod
@@ -35,25 +43,36 @@ class AuthBusinessLogicLayer:
         last_name: str = "",
         country_code: str | None = None,
     ) -> User:
-        if not user_dal.has_verified_identifier(identifier, otp_type=OTPType.LOGIN_SIGNUP):
-            raise IdentifierNotVerifiedException()
-
         if user_dal.get_by_identifier(identifier):
             raise UserAlreadyExistsException()
 
-        if is_email:
-            user = User.objects.create_user(
-                email=identifier,
-                first_name=first_name,
-                last_name=last_name,
-            )
-        else:
-            user = User.objects.create_user(
-                phone_number=identifier,
-                country_code=country_code,
-                first_name=first_name,
-                last_name=last_name,
-            )
+        try:
+            with transaction.atomic():
+                # Spent inside the transaction: if account creation fails, the
+                # verification is rolled back and can be used again.
+                if not user_dal.consume_verified_identifier(
+                    identifier,
+                    otp_type=OTPType.LOGIN_SIGNUP,
+                    max_age=REGISTRATION_WINDOW,
+                ):
+                    raise IdentifierNotVerifiedException()
+
+                if is_email:
+                    user = User.objects.create_user(
+                        email=identifier,
+                        first_name=first_name,
+                        last_name=last_name,
+                    )
+                else:
+                    user = User.objects.create_user(
+                        phone_number=identifier,
+                        country_code=country_code,
+                        first_name=first_name,
+                        last_name=last_name,
+                    )
+        except IntegrityError:
+            # e.g. the identifier still belongs to a soft-deleted account.
+            raise UserAlreadyExistsException()
         return user
 
     @staticmethod

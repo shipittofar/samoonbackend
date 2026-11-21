@@ -11,6 +11,11 @@ from rest_framework import status
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import IsAuthenticated
+from menu.authorization.branch_menu import (
+    PublicReadBranchMenuWriteMixin,
+    RequireBranchMenuManagePermission,
+    RequireBranchMenuViewPermission,
+)
 
 from menu.api.serializers.request import (
     ExtraGroupInputSerializer,
@@ -41,6 +46,7 @@ def _resolve_branch_id(request, kwargs):
     description="Create a new extra group for the specified branch.",
 )
 class ExtraGroupCreateView(CreateAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     serializer_class = ExtraGroupInputSerializer
 
     def create(self, request, *args, **kwargs):
@@ -79,7 +85,7 @@ class ExtraGroupListView(ListAPIView):
 class ConsoleExtraGroupListView(ListAPIView):
     serializer_class = ExtraGroupOutputSerializer
     pagination_class = ExtraGroupPagination
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RequireBranchMenuViewPermission]
 
     def get_queryset(self):
         branch_id = _resolve_branch_id(self.request, self.kwargs)
@@ -111,6 +117,7 @@ class ExtraGroupDetailView(RetrieveAPIView):
     description="Partially update an existing extra group.",
 )
 class ExtraGroupUpdateView(UpdateAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
     serializer_class = ExtraGroupUpdateSerializer
     http_method_names = ["patch"]
 
@@ -139,6 +146,7 @@ class ExtraGroupUpdateView(UpdateAPIView):
     )
 )
 class ExtraGroupDeleteView(DestroyAPIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def destroy(self, request, *args, **kwargs):
         extra_group_bll.delete_extra_group(
@@ -154,6 +162,7 @@ class ExtraGroupDeleteView(DestroyAPIView):
     description="Persist a new display order for all extra groups in a branch.",
 )
 class ExtraGroupReorderView(APIView):
+    permission_classes = [IsAuthenticated, RequireBranchMenuManagePermission]
 
     def patch(self, request, *args, **kwargs):
         input_serializer = ExtraGroupReorderSerializer(data=request.data)
@@ -176,7 +185,7 @@ class ExtraGroupReorderView(APIView):
     summary="Extra Group collection (frontend alias)",
     description="GET list, POST create, or PATCH reorder via /extra-groups/.",
 )
-class ExtraGroupCollectionAliasView(APIView):
+class ExtraGroupCollectionAliasView(PublicReadBranchMenuWriteMixin, APIView):
 
     def get(self, request, *args, **kwargs):
         branch_id = _resolve_branch_id(request, kwargs)
@@ -204,7 +213,7 @@ class ExtraGroupCollectionAliasView(APIView):
     summary="Extra Group detail (frontend alias)",
     description="GET, PATCH, or DELETE via /extra-groups/{id}/.",
 )
-class ExtraGroupDetailAliasView(APIView):
+class ExtraGroupDetailAliasView(PublicReadBranchMenuWriteMixin, APIView):
 
     def get(self, request, *args, **kwargs):
         group = extra_group_bll.get_extra_group_detail(

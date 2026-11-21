@@ -55,5 +55,29 @@ class UserDataAccessLayer:
         return qs.exists()
 
     @staticmethod
-    def has_verified_identifier(identifier: str, otp_type: str) -> bool:
-        return OTPCode.objects.filter(identifier=identifier, otp_type=otp_type, is_used=True).exists()
+    def consume_verified_identifier(identifier: str, otp_type: str, *, max_age) -> bool:
+        """Spend a recent, successful OTP verification of ``identifier`` exactly once.
+
+        Only a code the user actually entered correctly counts (``verified_at``),
+        within ``max_age``, and never twice. Superseded or exhausted codes are
+        ``is_used`` too but prove nothing. Call inside a transaction.
+        """
+        from django.utils import timezone
+
+        otp = (
+            OTPCode.objects.select_for_update()
+            .filter(
+                identifier=identifier,
+                otp_type=otp_type,
+                verified_at__isnull=False,
+                verified_at__gte=timezone.now() - max_age,
+                consumed_at__isnull=True,
+            )
+            .order_by("-verified_at")
+            .first()
+        )
+        if otp is None:
+            return False
+        otp.consumed_at = timezone.now()
+        otp.save(update_fields=["consumed_at"])
+        return True

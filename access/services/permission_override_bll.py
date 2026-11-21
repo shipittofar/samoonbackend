@@ -7,10 +7,15 @@ from access.models import Permission, PermissionOverride, PermissionOverrideEffe
 from access.services.permission_audit_bll import permission_audit_bll
 from access.services.rbac_bll import rbac_bll
 from core.exceptions import (
+    PermissionDeniedException,
     PermissionNotFoundException,
     PermissionOverrideNotFoundException,
     StaffMembershipNotFoundException,
 )
+
+# Platform-level permissions: they act across all tenants, so no tenant-scoped
+# grant (override) may carry them. Only Django superusers have them.
+PLATFORM_ONLY_PERMISSION_SLUGS = frozenset({"rbac.manage_roles"})
 
 
 class PermissionOverrideBusinessLogicLayer:
@@ -36,6 +41,13 @@ class PermissionOverrideBusinessLogicLayer:
         )
         permission = self._get_permission_or_raise(permission_id=permission_id)
         self._validate_effect(effect)
+        self._assert_actor_may_set(
+            tenant_id=tenant_id,
+            membership=membership,
+            permission=permission,
+            effect=effect,
+            actor_id=created_by_id,
+        )
 
         try:
             with transaction.atomic():
@@ -68,6 +80,13 @@ class PermissionOverrideBusinessLogicLayer:
             tenant_id=tenant_id, override_id=override_id
         )
         self._validate_effect(effect)
+        self._assert_actor_may_set(
+            tenant_id=tenant_id,
+            membership=override.membership,
+            permission=override.permission,
+            effect=effect,
+            actor_id=actor_id,
+        )
         previous_effect = override.effect
         override.effect = effect
 
@@ -87,6 +106,7 @@ class PermissionOverrideBusinessLogicLayer:
             tenant_id=tenant_id, override_id=override_id
         )
         membership = override.membership
+        self._assert_not_self(membership=membership, actor=self._actor(actor_id))
 
         with transaction.atomic():
             permission_audit_bll.record_override_removed(
@@ -95,6 +115,47 @@ class PermissionOverrideBusinessLogicLayer:
             override.delete()
 
         rbac_bll.invalidate_effective_permissions_for_membership(membership)
+
+    @staticmethod
+    def _actor(actor_id):
+        from accounts.models import User
+
+        actor = User.objects.filter(id=actor_id).first() if actor_id else None
+        if actor is None:
+            raise PermissionDeniedException()
+        return actor
+
+    @staticmethod
+    def _assert_not_self(*, membership, actor) -> None:
+        if actor.is_superuser:
+            return
+        if membership.user_id == actor.id:
+            raise PermissionDeniedException(
+                detail="You cannot change your own permissions."
+            )
+
+    def _assert_actor_may_set(self, *, tenant_id, membership, permission, effect, actor_id) -> None:
+        """Guard against privilege escalation through overrides:
+        - platform-only permissions are never granted per tenant;
+        - nobody changes their own permissions (superusers excepted);
+        - an "allow" may only grant a permission the actor holds in this tenant.
+        """
+        if permission.slug in PLATFORM_ONLY_PERMISSION_SLUGS:
+            raise PermissionDeniedException(
+                detail="This is a platform-level permission and cannot be granted inside a tenant."
+            )
+        actor = self._actor(actor_id)
+        self._assert_not_self(membership=membership, actor=actor)
+        if actor.is_superuser or effect != "allow":
+            return
+        from tenants.models import Tenant
+
+        tenant = Tenant.objects.select_related("owner").get(id=tenant_id)
+        held = rbac_bll.resolve_effective_permission_slugs(user=actor, tenant=tenant)
+        if permission.slug not in held:
+            raise PermissionDeniedException(
+                detail="You can only grant permissions you hold yourself."
+            )
 
     @staticmethod
     def _validate_effect(effect: str) -> None:

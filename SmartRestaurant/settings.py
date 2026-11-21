@@ -232,7 +232,18 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    # Requests arrive through exactly one reverse proxy (the frontend nginx), so
+    # the client IP is the last hop of X-Forwarded-For. Without this, a client
+    # could send its own X-Forwarded-For and dodge every per-IP limit.
+    'NUM_PROXIES': 1,
     'DEFAULT_THROTTLE_RATES': {
+        # Anonymous auth endpoints (per client IP): OTP SMS cost, code guessing,
+        # password brute force, account enumeration.
+        'auth_otp_send': '10/hour',
+        'auth_otp_verify': '30/hour',
+        'auth_register': '10/hour',
+        'auth_password_login': '20/hour',
+        'auth_password_reset': '10/hour',
         'address_create': '60/hour',
         'address_update': '120/hour',
         'address_delete': '60/hour',

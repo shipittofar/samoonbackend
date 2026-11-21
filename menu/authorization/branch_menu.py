@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import SAFE_METHODS, AllowAny, BasePermission, IsAuthenticated
 
 from access.authorization import TenantOwnerChecker
 from access.selectors import permission_selector
@@ -63,6 +63,27 @@ class RequireBranchMenuManagePermission(BasePermission):
 
         return True
 
+
+
+class RequireBranchMenuViewPermission(RequireBranchMenuManagePermission):
+    """Console (unpublished) menu reads: owner, branch manager, or menu.view."""
+
+    required_permission = "menu.view"
+
+
+class PublicReadBranchMenuWriteMixin:
+    """For views that serve the public storefront AND accept writes.
+
+    GET/HEAD/OPTIONS stay public (published menu data). Every write requires
+    menu.manage on the branch — the branch comes from the URL, the query string
+    or the body (see RequireBranchMenuManagePermission). Put this mixin first in
+    the class bases so its get_permissions wins.
+    """
+
+    def get_permissions(self):
+        if self.request.method in SAFE_METHODS:
+            return [AllowAny()]
+        return [IsAuthenticated(), RequireBranchMenuManagePermission()]
 
 def assert_branch_menu_write(user, branch_id) -> Branch:
     if not user or not getattr(user, "is_authenticated", False):

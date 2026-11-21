@@ -21,6 +21,26 @@ CACHES = {
     }
 }
 
+# The local-memory cache is shared by the whole test run, so real auth limits
+# would make unrelated tests fail with 429. Tests that check throttling set
+# their own rates.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,  # noqa: F405
+    "DEFAULT_THROTTLE_RATES": {
+        **REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],  # noqa: F405
+        **{
+            scope: "100000/minute"
+            for scope in (
+                "auth_otp_send",
+                "auth_otp_verify",
+                "auth_register",
+                "auth_password_login",
+                "auth_password_reset",
+            )
+        },
+    },
+}
+
 MEDIA_ROOT = tempfile.mkdtemp()
 STORAGES = {
     "default": {

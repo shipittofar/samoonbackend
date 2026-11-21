@@ -76,7 +76,7 @@ class EmailVerificationBusinessLogicLayer:
             commit_success=False,
         )
         with transaction.atomic():
-            otp.save(update_fields=["is_used"])
+            otp.save(update_fields=["is_used", "verified_at"])
             user.email = email
             user.save(update_fields=["email"])
         return user

@@ -18,7 +18,13 @@ class OTPCode(models.Model):
     otp_type = models.CharField(max_length=32, choices=OTPType.choices)
     code = models.CharField(max_length=6)
     attempts = models.PositiveSmallIntegerField(default=0)
+    # is_used is set for ANY terminal state (verified, superseded by a newer code,
+    # attempts exhausted) — it is NOT proof of ownership. verified_at is: it is only
+    # set when the correct code was entered.
     is_used = models.BooleanField(default=False)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    # Set when a verification is spent (e.g. by sign-up) so it can't be replayed.
+    consumed_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 

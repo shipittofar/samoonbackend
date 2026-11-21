@@ -10,7 +10,7 @@ from .tenant_access import (
     RequirePermission,
     TenantOwnerChecker,
 )
-from .role_management import CanManageRoleDefinitions, user_can_manage_role_definitions
+from .role_management import CanManageRoleDefinitions, IsSuperuser, user_can_manage_role_definitions
 from .admin_role_protection import (
     PROTECTED_ADMIN_SLUG,
     assert_role_assignable_by_actor,
@@ -35,6 +35,7 @@ __all__ = [
     "RequirePermission",
     "TenantOwnerChecker",
     "CanManageRoleDefinitions",
+    "IsSuperuser",
     "user_can_manage_role_definitions",
     "PROTECTED_ADMIN_SLUG",
     "assert_role_assignable_by_actor",
