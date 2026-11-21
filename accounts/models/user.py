@@ -4,6 +4,14 @@ from django.db import models
 from accounts.managers.user_manager import UserManager
 
 
+class UserRole(models.TextChoices):
+    """Read-only label derived from ``is_superuser`` (no column, so it can
+    never disagree with it)."""
+
+    CUSTOMER = "customer", "Customer"
+    ADMIN = "admin", "Admin"
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -68,6 +76,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self) -> str:
         return self.phone_number or self.email or str(self.id)
+
+    @property
+    def role(self) -> str:
+        """"admin" for a platform superuser, otherwise "customer"."""
+        return UserRole.ADMIN if self.is_superuser else UserRole.CUSTOMER
 
     @property
     def full_name(self) -> str:

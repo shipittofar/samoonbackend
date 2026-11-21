@@ -22,12 +22,13 @@ class TokenOutputSerializer(serializers.Serializer):
 class UserOutputSerializer(serializers.ModelSerializer):
     phone_number = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
+    role = serializers.CharField(read_only=True)  # "admin" iff is_superuser
 
     class Meta:
         model = User
         fields = [
             "id", "email", "phone_number", "first_name", "last_name",
-            "avatar", "is_verified", "is_superuser", "created_at",
+            "avatar", "role", "is_verified", "is_superuser", "created_at",
         ]
 
     def get_phone_number(self, obj):

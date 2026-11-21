@@ -4,7 +4,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Prefetch
 from rest_framework.exceptions import ValidationError
 
-from accounts.models import User
+from accounts.models import User, UserRole
 from access.authorization.tenant_access import TenantOwnerChecker
 from access.constants import MembershipStatus
 from access.models import StaffAssignment, StaffMembership
@@ -199,6 +199,7 @@ class RbacSessionBusinessLogicLayer:
             "avatar": avatar,
             "is_verified": bool(user.is_verified),
             "is_superuser": bool(user.is_superuser),
+            "role": UserRole.ADMIN.value if user.is_superuser else UserRole.CUSTOMER.value,
             "created_at": user.created_at,
         }
 

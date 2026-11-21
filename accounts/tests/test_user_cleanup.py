@@ -119,13 +119,41 @@ class DeletedAccountTests(TestCase):
         self.assertFalse(user.is_deleted)
 
 
-class RoleFieldIsGoneTests(TestCase):
-    def test_api_user_has_no_role_and_keeps_is_verified(self):
+class RoleFollowsSuperuserTests(TestCase):
+    """role is derived: "admin" exactly when is_superuser is true."""
+
+    def me(self, user):
         client = APIClient()
-        client.force_authenticate(make_user())
-        payload = client.get("/api/auth/me/").json()["user"]
-        self.assertNotIn("role", payload)
-        self.assertIn("is_verified", payload)
+        client.force_authenticate(user)
+        return client.get("/api/auth/me/").json()["user"]
+
+    def test_superuser_is_admin_everyone_else_customer(self):
+        self.assertEqual(self.me(make_user(is_superuser=True, is_staff=True))["role"], "admin")
+        self.assertEqual(self.me(make_user())["role"], "customer")
+        self.assertEqual(self.me(make_user(is_staff=True))["role"], "customer")
+
+    def test_admin_add_gives_admin_and_revoke_takes_it_away(self):
+        import io, os
+        from unittest import mock
+        from django.core.management import call_command
+        from accounts.services import superuser_bll
+
+        with mock.patch.dict(os.environ, {"DJANGO_SUPERUSER_PASSWORD": "Str0ng-Pass-2026!"}):
+            call_command("admin_add", "09121234567", "--no-input", stdout=io.StringIO())
+        root = User.objects.get(phone_number=FULL)
+        self.assertEqual(root.role, "admin")
+
+        other = make_user(is_superuser=True, is_staff=True)
+        superuser_bll.revoke(other, actor=root)
+        other.refresh_from_db()
+        self.assertEqual(other.role, "customer")
+
+    def test_user_endpoints_carry_role(self):
+        root = make_user(is_superuser=True, is_staff=True)
+        client = APIClient()
+        client.force_authenticate(root)
+        detail = client.get(f"/api/auth/users/{root.id}/").json()
+        self.assertEqual(detail["role"], "admin")
 
 
 class SuspendedOwnerTests(TestCase):

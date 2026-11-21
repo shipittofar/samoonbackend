@@ -388,7 +388,7 @@ class AuthTokenValidityTests(TestCase):
 class AuthMeUserProfileContractTests(TestCase):
     EXPECTED_USER_KEYS = {
         "id", "email", "accountType", "phone_number", "first_name",
-        "last_name", "avatar", "is_verified", "is_superuser", "created_at",
+        "last_name", "avatar", "is_verified", "is_superuser", "role", "created_at",
     }
 
     def test_normal_verified_user(self):

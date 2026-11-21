@@ -9,7 +9,7 @@ from core.exceptions.account import AccountAlreadyDeletedException
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     list_display = [
-        "phone_number", "email", "full_name",
+        "phone_number", "email", "full_name", "role",
         "is_verified", "is_active", "is_superuser", "is_deleted", "created_at",
     ]
     list_filter = ["is_active", "is_superuser", "is_verified", "is_deleted"]

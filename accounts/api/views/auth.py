@@ -379,6 +379,7 @@ class RequestEmailVerificationView(CreateAPIView):
                 "first_name": "John",
                 "last_name": "Doe",
                 "avatar": None,
+                "role": "customer",
                 "is_verified": False,
                 "is_superuser": False,
                 "created_at": "2026-01-01T12:00:00Z",
