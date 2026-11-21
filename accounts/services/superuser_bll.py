@@ -4,12 +4,12 @@ See accounts/models/superuser_request.py for the rules.
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from django.db import transaction
 from django.utils import timezone
 
+from accounts import phone
 from accounts.models import (
     PlatformSecuritySettings,
     SuperuserRequest,
@@ -18,9 +18,6 @@ from accounts.models import (
 )
 
 DEFAULT_COUNTRY_CODE = "+98"
-
-_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
-_COUNTRY_CODE = re.compile(r"^\+[1-9]\d{0,3}$")
 
 
 class SuperuserError(Exception):
@@ -37,33 +34,20 @@ class PhoneNumber:
         return f"{self.country_code}{self.national}"
 
     def stored_variants(self) -> list[str]:
-        """How this number may already be stored. Sign-up does not strip the
-        trunk 0, so "+98" + "0912…" exists alongside "+98" + "912…"."""
+        """How this number may already be stored: accounts created before
+        numbers were normalized (migration 0011) may keep the trunk 0."""
         return [self.full, f"{self.country_code}0{self.national}"]
 
 
 def normalize_phone(raw: str, country_code: str = DEFAULT_COUNTRY_CODE) -> PhoneNumber:
     """Accepts 09121234567, 9121234567, +989121234567, 00989121234567, Persian
-    digits, spaces and dashes. A number in international form must use
-    ``country_code`` (pass another one for a non-Iranian number)."""
-    if not _COUNTRY_CODE.match(country_code or ""):
-        raise SuperuserError("Country code must look like +98.")
-    value = re.sub(r"[\s\-().]", "", (raw or "").translate(_DIGITS))
-    if value.startswith("00"):
-        value = "+" + value[2:]
-    if value.startswith("+"):
-        if not value.startswith(country_code):
-            raise SuperuserError(
-                f"The number does not start with {country_code}. "
-                "Pass its country code with --country-code."
-            )
-        national = value[len(country_code):]
-    else:
-        national = value
-    national = national.lstrip("0")
-    if not national.isdigit() or not 6 <= len(national) <= 14:
-        raise SuperuserError("That is not a valid phone number.")
-    return PhoneNumber(country_code=country_code, national=national)
+    digits, spaces and dashes (accounts/phone.py). A number in international
+    form must use ``country_code`` (pass another one for a non-Iranian number)."""
+    try:
+        code = phone.clean_country_code(country_code)
+        return PhoneNumber(country_code=code, national=phone.normalize_national(code, raw))
+    except phone.InvalidPhoneNumber as exc:
+        raise SuperuserError(f"{exc} Pass its country code with --country-code if it is not {country_code}.")
 
 
 def active_superusers():

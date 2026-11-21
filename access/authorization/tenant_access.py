@@ -27,8 +27,13 @@ class TenantOwnerChecker:
         if is_platform_superuser(user):
             return True
         from tenants.models import Tenant
+        from tenants.models.tenant import OwnerStatus
 
-        return Tenant.objects.filter(id=tenant_id, owner__user_id=user.id).exists()
+        return (
+            Tenant.objects.filter(id=tenant_id, owner__user_id=user.id)
+            .exclude(owner__status=OwnerStatus.SUSPENDED)
+            .exists()
+        )
 
 
 class BaseTenantPermission(BasePermission):
@@ -117,4 +122,4 @@ class RequirePermission:
                 "tenant_lookup_kwarg": tenant_lookup_kwarg,
                 "branch_lookup_kwarg": branch_lookup_kwarg,
             },
-        )
+        )

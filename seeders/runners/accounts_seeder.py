@@ -1,7 +1,7 @@
 from django.conf import settings
 from faker import Faker
 
-from accounts.models.user import User, UserRole
+from accounts.models.user import User
 from seeders.base import BaseSeeder
 from seeders.registry import SeedRegistry
 
@@ -21,7 +21,6 @@ class AdminUserSeeder(BaseSeeder):
                 "email": settings.SEED_ADMIN_EMAIL,
                 "first_name": "Super",
                 "last_name": "Admin",
-                "role": UserRole.ADMIN,
                 "is_staff": True,
                 "is_superuser": True,
                 "is_verified": True,
@@ -56,7 +55,6 @@ class OwnerUserSeeder(BaseSeeder):
                     "email": f"owner{i}@seed.local",
                     "first_name": fake.first_name(),
                     "last_name": fake.last_name(),
-                    "role": UserRole.CUSTOMER,
                     "is_verified": True,
                     "is_active": True,
                 },
@@ -87,7 +85,6 @@ class CustomerUserSeeder(BaseSeeder):
                     "email": f"customer{i}@seed.local",
                     "first_name": fake.first_name(),
                     "last_name": fake.last_name(),
-                    "role": UserRole.CUSTOMER,
                     "is_verified": True,
                     "is_active": True,
                 },
@@ -99,4 +96,4 @@ class CustomerUserSeeder(BaseSeeder):
             stdout.write(
                 f"[seed] Customer {'created' if created else 'exists'}: {user.full_name}"
             )
-            registry.append("users:customers", user)
+            registry.append("users:customers", user)

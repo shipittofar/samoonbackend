@@ -4,11 +4,6 @@ from django.db import models
 from accounts.managers.user_manager import UserManager
 
 
-class UserRole(models.TextChoices):
-    CUSTOMER = "customer", "Customer"
-    ADMIN = "admin", "Admin"
-
-
 class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -27,8 +22,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         related_name="+",
     )
 
-    role = models.CharField(max_length=16, choices=UserRole.choices, default=UserRole.CUSTOMER)
-    is_verified = models.BooleanField(default=False)
+    # Not identity verification: true once the person confirmed a complete
+    # profile (first/last name, phone, email) via POST /api/auth/verify-account/.
+    is_verified = models.BooleanField(
+        default=False,
+        verbose_name="profile confirmed",
+        help_text="Set by verify-account once name, phone and email are all present.",
+    )
 
     active_tenant = models.ForeignKey(
         "tenants.Tenant",
@@ -49,6 +49,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(blank=True, null=True)
+    # A deleted account gives its phone and email back (so the person can sign
+    # up again); the old values are kept here for support and for restoring.
+    deleted_phone_number = models.CharField(max_length=20, blank=True, null=True)
+    deleted_email = models.EmailField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -83,4 +87,4 @@ class User(AbstractBaseUser, PermissionsMixin):
         ):
             raise ValidationError(
                 {"active_branch": "active_branch must belong to active_tenant."}
-            )
+            )

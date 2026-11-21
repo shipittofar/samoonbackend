@@ -255,10 +255,9 @@ class NoUserRoleReferenceTests(TestCase):
         self.assertEqual(hits, [], f"Found user.role usage: {hits}")
 
     def test_user_model_has_no_role_field(self):
-        self.skipTest(
-            "User.role column still exists in this codebase; "
-            "removal is tracked separately from Phase 1 RBAC."
-        )
+        from accounts.models import User
+
+        self.assertNotIn("role", {f.name for f in User._meta.get_fields()})
 
 
 class AuthMeEdgeCaseTests(TestCase):

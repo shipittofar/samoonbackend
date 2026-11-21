@@ -76,7 +76,54 @@ class ProfileBusinessLogicLayer:
     def soft_delete(cls, user: User) -> None:
         if user.is_deleted:
             raise AccountAlreadyDeletedException()
+        # Give the phone and email back so the person can sign up again; keep
+        # the old values for support and for restore().
+        user.deleted_phone_number = user.phone_number
+        user.deleted_email = user.email
+        user.phone_number = None
+        user.email = None
         user.is_deleted = True
         user.is_active = False
         user.deleted_at = timezone.now()
-        user.save(update_fields=["is_deleted", "is_active", "deleted_at"])
+        user.save(update_fields=[
+            "deleted_phone_number", "deleted_email", "phone_number", "email",
+            "is_deleted", "is_active", "deleted_at",
+        ])
+        _revoke_all_tokens(user)
+
+    @classmethod
+    def restore(cls, user: User) -> User:
+        """Undo soft_delete. Refused when the phone or email was taken by an
+        account created after the deletion."""
+        if not user.is_deleted:
+            return user
+        phone, email = user.deleted_phone_number, user.deleted_email
+        others = User.objects.exclude(pk=user.pk)
+        if phone and others.filter(phone_number=phone).exists():
+            raise AccountRestoreConflict(f"{phone} now belongs to another account.")
+        if email and others.filter(email=email).exists():
+            raise AccountRestoreConflict(f"{email} now belongs to another account.")
+        user.phone_number, user.email = phone, email
+        user.deleted_phone_number = user.deleted_email = None
+        user.is_deleted = False
+        user.is_active = True
+        user.deleted_at = None
+        user.save(update_fields=[
+            "deleted_phone_number", "deleted_email", "phone_number", "email",
+            "is_deleted", "is_active", "deleted_at",
+        ])
+        return user
+
+
+class AccountRestoreConflict(Exception):
+    """The message is shown to the admin."""
+
+
+def _revoke_all_tokens(user: User) -> None:
+    """Blacklist every refresh token of a deleted account."""
+    try:
+        from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+    except Exception:  # blacklist app not installed
+        return
+    for token in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=token)

@@ -27,7 +27,7 @@ class UserOutputSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "email", "phone_number", "first_name", "last_name",
-            "avatar", "role", "is_verified", "is_superuser", "created_at",
+            "avatar", "is_verified", "is_superuser", "created_at",
         ]
 
     def get_phone_number(self, obj):
@@ -134,4 +134,4 @@ class UserMeOutputSerializer(serializers.Serializer):
     activeMembership = ActiveMembershipOutputSerializer(allow_null=True)
     tenantRoles = TenantRoleSerializer(many=True)
     ownership = OwnershipSerializer(many=True)
-    staffAssignments = StaffAssignmentSerializer(many=True)
+    staffAssignments = StaffAssignmentSerializer(many=True)

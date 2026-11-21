@@ -21,6 +21,7 @@ from tenants.selectors import (
 from tenants.selectors.tenant_availability import PUBLIC_TENANT_FILTER
 from accounts.selectors import UserDataAccessLayer
 from access.authorization.platform import is_platform_superuser
+from access.constants.tenant_eligibility import is_owner_suspended
 from accounts.services.workspace_bll import workspace_bll
 from core.exceptions import (
     TenantNotFoundException,
@@ -111,6 +112,8 @@ def _assert_owns_tenant(user, tenant) -> None:
     owner_user_id = getattr(tenant, "owner_user_id", None)
     if owner_user_id is None or owner_user_id != user.id:
         raise TenantPermissionDeniedException()
+    if is_owner_suspended(user.id):
+        raise TenantPermissionDeniedException()
 
 
 class TenantBusinessLogicLayer:
@@ -118,6 +121,8 @@ class TenantBusinessLogicLayer:
     @staticmethod
     @transaction.atomic
     def create_tenant(user, **data) -> Tenant:
+        if is_owner_suspended(user.id):
+            raise TenantPermissionDeniedException()
         owner = owner_dal.get_or_create_by_user_id(user.id)
 
         if tenant_dal.exists_by_name_for_owner(owner.id, data["name"]):
@@ -325,6 +330,8 @@ def _assert_owns_branch(user, branch) -> None:
     """Branch ownership via flat ``owner_user_id`` / ``tenant_id`` only."""
     if is_platform_superuser(user):
         return
+    if is_owner_suspended(user.id):
+        raise BranchPermissionDeniedException()
     owner_user_id = getattr(branch, "owner_user_id", None)
     if owner_user_id is not None:
         if owner_user_id != user.id:

@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from accounts.models import User, UserRole
+from accounts.models import User
 from orders.models import Order, OrderStatus, OrderType, PaymentMethod
 from reservations.models import Reservation, ReservationStatus
 from tenants.models import Branch, Owner, Tenant
@@ -23,7 +23,6 @@ def make_user(**kwargs):
         "email": f"{uuid.uuid4().hex}@example.com",
         "first_name": "Test",
         "last_name": "User",
-        "role": UserRole.CUSTOMER,
     }
     defaults.update(kwargs)
     user = User(**defaults)
@@ -215,8 +214,8 @@ class ConsoleTenantCustomersListTests(TestCase):
         self.assertEqual(response.data["count"], 0)
         self.assertEqual(response.data["results"], [])
 
-    def test_non_customer_role_is_not_returned(self):
-        admin = make_user(role=UserRole.ADMIN, first_name="Admin")
+    def test_platform_superuser_is_not_returned(self):
+        admin = make_user(is_superuser=True, first_name="Admin")
         make_order(self.branch_a, customer=admin)
 
         response = self.client.get(self.url)

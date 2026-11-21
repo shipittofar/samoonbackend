@@ -14,7 +14,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce, Concat, Greatest
 from django.db.models.query import QuerySet
 
-from accounts.models import User, UserRole
+from accounts.models import User
 from orders.models import Order
 from reservations.models import Reservation
 
@@ -75,7 +75,7 @@ class ConsoleCustomersDataAccessLayer:
         )
 
         queryset = (
-            User.objects.filter(role=UserRole.CUSTOMER)
+            User.objects.filter(is_superuser=False)  # platform superusers are not customers
             .filter(Q(has_order) | Q(has_reservation))
             .annotate(
                 orders_count=Coalesce(orders_count, Value(0)),
