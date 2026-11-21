@@ -70,6 +70,11 @@ class MembershipOutputSerializer(serializers.Serializer):
     roles = serializers.SerializerMethodField()
     branchAccess = serializers.SerializerMethodField()
     branches = serializers.SerializerMethodField()
+    # True when a platform superuser opened a business they do not own.
+    platformAccess = serializers.SerializerMethodField()
+
+    def get_platformAccess(self, membership):
+        return bool(membership.get("platform_access"))
 
     def get_tenant(self, membership):
         tenant = membership["tenant"]

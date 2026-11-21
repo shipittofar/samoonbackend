@@ -15,6 +15,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from tenants.api.serializers.response import *
 from tenants.api.serializers.request import *
+from core.exceptions import PermissionDeniedException
 from tenants.services import TenantBusinessLogicLayer, BranchBusinessLogicLayer
 
 
@@ -39,6 +40,14 @@ class TenantCreateAPIView(CreateAPIView):
     permission_classes = (IsAuthenticated,)
 
     def create(self, request, *args, **kwargs):
+        from tenants.services.business_request_bll import may_create_business_directly
+
+        # New businesses come through a registration request that a platform
+        # superuser approves; only superusers and approved owners create directly.
+        if not may_create_business_directly(request.user):
+            raise PermissionDeniedException(
+                "Send a business registration request (POST /api/tenants/business-requests/)."
+            )
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

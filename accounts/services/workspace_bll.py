@@ -173,6 +173,8 @@ def _clean_workspace_fields_or_raise(
 class WorkspaceBusinessLogicLayer:
     @staticmethod
     def user_can_access_branch(user: User, branch: Branch) -> bool:
+        if user.is_superuser and user.is_active:
+            return True
         owner_profile = getattr(user, "owner_profile", None)
         if owner_profile and owner_profile.tenants.filter(id=branch.tenant_id).exists():
             return True
@@ -305,9 +307,16 @@ class WorkspaceBusinessLogicLayer:
         from access.services.membership_bll import membership_service
 
         coerced_tenant_id = _coerce_uuid(tenant_id)
-        valid_ids = membership_service.get_valid_tenant_ids(user)
-        if str(coerced_tenant_id) not in valid_ids:
-            raise NotAMemberOfTenantException()
+        if user.is_superuser and user.is_active:
+            # Platform superusers may open any business that exists.
+            from tenants.models import Tenant
+
+            if not Tenant.objects.filter(id=coerced_tenant_id).exists():
+                raise NotAMemberOfTenantException()
+        else:
+            valid_ids = membership_service.get_valid_tenant_ids(user)
+            if str(coerced_tenant_id) not in valid_ids:
+                raise NotAMemberOfTenantException()
 
         locked = User.objects.select_for_update().get(pk=user.pk)
 

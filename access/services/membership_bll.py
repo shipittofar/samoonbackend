@@ -278,6 +278,21 @@ class MembershipBusinessLogicLayer:
             for tenant in tenants:
                 data.append({"tenant": tenant, "is_owner": True})
 
+        # A platform superuser can work in any business. The one they opened
+        # (active tenant) is listed like an owned one, flagged platform_access,
+        # so the owner console works for it without a real membership.
+        if (
+            getattr(user, "is_superuser", False)
+            and getattr(user, "is_active", False)
+            and getattr(user, "active_tenant_id", None)
+            and not any(str(m["tenant"].id) == str(user.active_tenant_id) for m in data)
+        ):
+            from tenants.models import Tenant
+
+            tenant = Tenant.objects.filter(id=user.active_tenant_id).first()
+            if tenant is not None:
+                data.append({"tenant": tenant, "is_owner": True, "platform_access": True})
+
         for sm in membership_selector.get_active_staff_memberships(user=user):
             if (
                 hasattr(sm, "_prefetched_objects_cache")

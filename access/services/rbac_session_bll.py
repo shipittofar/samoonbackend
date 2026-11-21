@@ -190,8 +190,11 @@ class RbacSessionBusinessLogicLayer:
         return {
             "id": str(user.id),
             "email": user.email,
+            # Platform superusers always get the business console.
             "accountType": (
-                "business" if has_owner_profile or has_staff_membership else "customer"
+                "business"
+                if has_owner_profile or has_staff_membership or user.is_superuser
+                else "customer"
             ),
             "phone_number": user.phone_number or "",
             "first_name": user.first_name or "",

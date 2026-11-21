@@ -2,10 +2,13 @@ from django.urls import include, path
 
 from access.api.views.tenant_roles import TenantRoleListView
 from tenants.api.views import *
+from tenants.api.views.business_request import MyBusinessRequestsView
 
 app_name = "tenants"
 
 urlpatterns = [
+    # Business registration requests (approved by platform superusers)
+    path("business-requests/", MyBusinessRequestsView.as_view(), name="my-business-requests"),
     # Tenant
     path("create/",
          TenantCreateAPIView.as_view(),

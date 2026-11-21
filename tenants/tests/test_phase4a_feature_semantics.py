@@ -51,6 +51,7 @@ class Phase4AFeaturesStripTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
 
         response = client.post(
             "/api/tenants/create/",

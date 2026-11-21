@@ -61,6 +61,7 @@ class BusinessTypesApiValidationTests(TestCase):
         self.user = make_user()
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
+        Owner.objects.get_or_create(user=self.user)  # approved owners create businesses directly
 
     def test_create_accepts_legacy_coffee_as_cafe(self):
         response = self.client.post(
@@ -97,7 +98,7 @@ class BusinessTypesApiValidationTests(TestCase):
 
     def test_discover_returns_business_types_not_legacy_type(self):
         cache.clear()
-        owner = Owner.objects.create(user=self.user)
+        owner, _ = Owner.objects.get_or_create(user=self.user)
         tenant = Tenant.objects.create(
             owner=owner,
             name="Discover Cafe",

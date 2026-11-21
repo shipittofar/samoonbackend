@@ -67,6 +67,8 @@ urlpatterns = [
     path('qr/<slug:code>/', include(('tenants.api.urls_qr', 'qr'), namespace='qr')),
     path('api/public/', include('tenants.api.urls_public', namespace='public')),
     path('api/tenants/', include('tenants.api.urls', namespace='tenants')),
+    # Platform superuser console API
+    path('api/superadmin/', include('superadmin.api.urls', namespace='superadmin')),
     path('api/branches/', include('tenants.api.urls_branches', namespace='branches')),
     path('api/menu/', include('menu.api.urls', namespace='menu')),
 

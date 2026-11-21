@@ -132,6 +132,7 @@ class SettingsContractAPITests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
         response = client.post(
             "/api/tenants/create/",
             data={"name": "Phase5B Allowed", "settings": VALID_SETTINGS},
@@ -144,6 +145,7 @@ class SettingsContractAPITests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
         response = client.post(
             "/api/tenants/create/",
             data={

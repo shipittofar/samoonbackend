@@ -23,6 +23,17 @@ from tenants.api.views.qr_manage import (
 app_name = "menu"
 
 urlpatterns = [
+    # Ready-made menus (prepared by platform superusers per business type)
+    path(
+        "branches/<uuid:branch_id>/templates/",
+        BranchMenuTemplateListView.as_view(),
+        name="menu-branch-templates",
+    ),
+    path(
+        "branches/<uuid:branch_id>/templates/<uuid:template_id>/apply/",
+        BranchMenuTemplateApplyView.as_view(),
+        name="menu-branch-template-apply",
+    ),
     path(
         "branches/<uuid:branch_id>/qr/",
         MenuQrRetrieveAPIView.as_view(),

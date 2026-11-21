@@ -62,6 +62,7 @@ class TenantSettingsCreateTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
 
         response = client.post(
             "/api/tenants/create/",
@@ -81,6 +82,7 @@ class TenantSettingsCreateTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
 
         response = client.post(
             "/api/tenants/create/", data={"name": "No Settings Tenant"}, format="json"
@@ -93,6 +95,7 @@ class TenantSettingsCreateTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
 
         response = client.post(
             "/api/tenants/create/",
@@ -107,6 +110,7 @@ class TenantSettingsCreateTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
 
         unconventional_settings = {
             "marketplace": {"rating": "4.7", "somethingNew": {"nested": True}},
@@ -125,6 +129,7 @@ class TenantSettingsCreateTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
 
         payload = {
             "currency": "EUR",
@@ -292,6 +297,7 @@ class TenantSettingsResponseContractTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
 
         create_response = client.post(
             "/api/tenants/create/",

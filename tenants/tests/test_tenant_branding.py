@@ -176,6 +176,7 @@ class TenantBrandingCrudTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
         settings = {
             "theme": {
                 "primaryColor": "#112233",
@@ -196,6 +197,7 @@ class TenantBrandingCrudTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
         response = client.post(
             "/api/tenants/create/",
             data={
@@ -210,6 +212,7 @@ class TenantBrandingCrudTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
         response = client.post(
             "/api/tenants/create/",
             data={
@@ -225,6 +228,7 @@ class TenantBrandingCrudTests(TestCase):
         user = make_user()
         client = APIClient()
         client.force_authenticate(user=user)
+        Owner.objects.get_or_create(user=user)  # approved owners create businesses directly
         settings = {
             "marketplace": {"rating": 4.7, "tagline": "Hello"},
             "contactEmail": "ops@example.com",

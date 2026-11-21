@@ -5,3 +5,4 @@ from .tenant import (
     WorkingHourAdmin
 )
 from .qr import QrCodeAdmin
+from .business_request import BusinessRequestAdmin

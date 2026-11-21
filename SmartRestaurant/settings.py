@@ -135,6 +135,7 @@ INSTALLED_APPS = [
     'seeders.apps.SeedersConfig',
     'website_builder.apps.WebsiteBuilderConfig',
     'uploads.apps.UploadsConfig',
+    'superadmin.apps.SuperadminConfig',
 ]
 
 MIDDLEWARE = [
