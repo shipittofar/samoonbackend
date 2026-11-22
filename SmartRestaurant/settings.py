@@ -251,6 +251,9 @@ REST_FRAMEWORK = {
         'address_read': '180/hour',
     },
 }
+# IP-to-country database (DB-IP Lite .mmdb, downloaded by deploy/backend-up.sh);
+# preselects the phone country code on sign-in. Missing file = no guess.
+GEOIP_COUNTRY_DB = os.getenv("GEOIP_COUNTRY_DB", str(BASE_DIR / "geoip" / "country.mmdb"))
 MAX_USER_ADDRESSES = int(os.getenv("MAX_USER_ADDRESSES", "20"))
 # Frontend origin used when QR resolution redirects to storefront paths.
 PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "http://localhost:3000").rstrip("/")

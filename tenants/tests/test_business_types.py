@@ -43,6 +43,8 @@ class BusinessTypeConstantsTests(TestCase):
                 "food_court",
                 "mobile_cafe",
                 "gym",
+                "beauty_salon",
+                "clinic",
             }),
         )
 

@@ -200,3 +200,6 @@ mocktest.ts
 frontend_helper.md
 SmartRestaurant/backend.code-workspace
 celerybeat-schedule*
+
+# IP-to-country database, downloaded on the server by deploy/backend-up.sh
+geoip/

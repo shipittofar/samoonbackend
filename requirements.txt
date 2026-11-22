@@ -4,6 +4,7 @@ attrs==26.1.0
 
 Django==6.0.5
 djangorestframework==3.17.1
+maxminddb==2.6.2
 drf-spectacular==0.29.0
 djangorestframework_simplejwt==5.5.1
 django-cors-headers==4.9.0

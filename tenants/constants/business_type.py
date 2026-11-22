@@ -9,6 +9,8 @@ class BusinessType(models.TextChoices):
     FOOD_COURT = "food_court", "Food Court"
     MOBILE_CAFE = "mobile_cafe", "Mobile Cafe"
     GYM = "gym", "Gym"
+    BEAUTY_SALON = "beauty_salon", "Beauty Salon"
+    CLINIC = "clinic", "Clinic"
 
 
 BUSINESS_TYPE_VALUES = frozenset(choice.value for choice in BusinessType)
