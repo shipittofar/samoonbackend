@@ -9,7 +9,7 @@ from access.models import Role, StaffMembership, StaffMembershipStatus
 from access.services.assignment_bll import assignment_bll
 from access.services.rbac_bll import rbac_bll
 from accounts.models import User
-from tenants.models import Owner, Tenant
+from tenants.models import Owner, Tenant, TenantStatus
 
 
 def make_user(**kwargs):
@@ -31,7 +31,7 @@ def make_owner_tenant(user=None, name=None):
     if user is None:
         user = make_user()
     owner = Owner.objects.create(user=user)
-    tenant = Tenant.objects.create(
+    tenant = Tenant.objects.create(status=TenantStatus.ACTIVE, 
         owner=owner,
         name=name or f"Tenant {uuid.uuid4().hex[:6]}",
     )
@@ -42,7 +42,7 @@ class TenantResolutionTests(TestCase):
     def test_x_tenant_slug_takes_precedence(self):
         user, tenant_a = make_owner_tenant(name="Alpha Tenant")
         other_owner = Owner.objects.create(user=make_user())
-        tenant_b = Tenant.objects.create(owner=other_owner, name="Beta Tenant")
+        tenant_b = Tenant.objects.create(status=TenantStatus.ACTIVE, owner=other_owner, name="Beta Tenant")
         StaffMembership.objects.create(
             user=user,
             tenant=tenant_b,
@@ -117,7 +117,7 @@ class TenantResolutionTests(TestCase):
     def test_multi_tenant_without_context_returns_ambiguous(self):
         user, _tenant_a = make_owner_tenant()
         other_owner = Owner.objects.create(user=make_user())
-        tenant_b = Tenant.objects.create(
+        tenant_b = Tenant.objects.create(status=TenantStatus.ACTIVE, 
             owner=other_owner,
             name=f"Other {uuid.uuid4().hex[:4]}",
         )

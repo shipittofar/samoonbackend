@@ -23,7 +23,7 @@ from orders.models import (
     PaymentMethod,
     PaymentStatus,
 )
-from tenants.models import Branch, Owner, Tenant
+from tenants.models import Branch, Owner, Tenant, TenantStatus
 
 
 METRICS_URL = "/api/branches/console-branches/{branch_id}/metrics/"
@@ -47,7 +47,7 @@ def make_user(**kwargs):
 def make_tenant_with_owner():
     user = make_user()
     owner = Owner.objects.create(user=user)
-    tenant = Tenant.objects.create(
+    tenant = Tenant.objects.create(status=TenantStatus.ACTIVE, 
         owner=owner,
         name=f"Tenant {uuid.uuid4().hex[:6]}",
     )

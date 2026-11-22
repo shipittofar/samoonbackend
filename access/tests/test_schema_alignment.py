@@ -14,7 +14,7 @@ from access.models import Role, RolePermission, StaffAssignment, StaffMembership
 from access.services.assignment_bll import assignment_bll
 from access.services.rbac_bll import rbac_bll
 from accounts.models import User
-from tenants.models import Branch, Owner, Tenant
+from tenants.models import Branch, Owner, Tenant, TenantStatus
 
 
 def make_user(**kwargs):
@@ -39,6 +39,8 @@ def make_owner_tenant(user=None, **tenant_kwargs):
     tenant = Tenant.objects.create(
         owner=owner,
         name=tenant_kwargs.pop("name", f"Tenant {uuid.uuid4().hex[:6]}"),
+        # A new tenant is INACTIVE (no branches yet) and grants no RBAC.
+        status=tenant_kwargs.pop("status", TenantStatus.ACTIVE),
         **tenant_kwargs,
     )
     return user, tenant
@@ -144,7 +146,7 @@ class AuthMeTests(TestCase):
 
     def test_me_memberships_include_independent_tenant_names(self):
         user, tenant_a = make_owner_tenant(name="Samoon Restaurant")
-        tenant_b = Tenant.objects.create(
+        tenant_b = Tenant.objects.create(status=TenantStatus.ACTIVE, 
             owner=tenant_a.owner,
             name="Brew Cafe",
         )
@@ -274,7 +276,7 @@ class AuthMeEdgeCaseTests(TestCase):
 
     def test_multi_tenant_user_sees_both_memberships_scoped(self):
         user, tenant_a = make_owner_tenant()
-        tenant_b = Tenant.objects.create(
+        tenant_b = Tenant.objects.create(status=TenantStatus.ACTIVE, 
             owner=user.owner_profile,
             name=f"Tenant B {uuid.uuid4().hex[:4]}",
         )

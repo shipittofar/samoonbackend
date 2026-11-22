@@ -9,7 +9,7 @@ from access.models import Role, StaffMembership, StaffMembershipStatus
 from access.services.assignment_bll import assignment_bll
 from access.services.rbac_bll import PERMISSIONS_CATALOG_CACHE_KEY, ROLES_CATALOG_CACHE_KEY
 from accounts.models import User
-from tenants.models import Owner, Tenant
+from tenants.models import Owner, Tenant, TenantStatus
 
 
 def make_user(**kwargs):
@@ -30,7 +30,7 @@ def make_user(**kwargs):
 def make_tenant_with_owner():
     user = make_user()
     owner = Owner.objects.create(user=user)
-    tenant = Tenant.objects.create(
+    tenant = Tenant.objects.create(status=TenantStatus.ACTIVE, 
         owner=owner,
         name=f"Tenant {uuid.uuid4().hex[:6]}",
     )
@@ -173,9 +173,9 @@ class MePermissionsTests(TestCase):
     def test_ambiguous_tenant_returns_400(self):
         user = make_user()
         owner = Owner.objects.create(user=user)
-        Tenant.objects.create(owner=owner, name=f"T1 {uuid.uuid4().hex[:4]}")
+        Tenant.objects.create(status=TenantStatus.ACTIVE, owner=owner, name=f"T1 {uuid.uuid4().hex[:4]}")
         other_owner = Owner.objects.create(user=make_user())
-        other_tenant = Tenant.objects.create(
+        other_tenant = Tenant.objects.create(status=TenantStatus.ACTIVE, 
             owner=other_owner,
             name=f"T2 {uuid.uuid4().hex[:4]}",
         )

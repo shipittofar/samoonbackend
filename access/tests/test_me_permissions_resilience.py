@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 from access.models import Role, StaffMembership, StaffMembershipStatus
 from access.services.assignment_bll import assignment_bll
 from accounts.models import User
-from tenants.models import Owner, Tenant
+from tenants.models import Owner, Tenant, TenantStatus
 
 
 def make_user(**kwargs):
@@ -29,7 +29,7 @@ def make_user(**kwargs):
 def make_tenant_with_owner():
     user = make_user()
     owner = Owner.objects.create(user=user)
-    tenant = Tenant.objects.create(
+    tenant = Tenant.objects.create(status=TenantStatus.ACTIVE, 
         owner=owner,
         name=f"Tenant {uuid.uuid4().hex[:6]}",
     )

@@ -56,3 +56,11 @@ AWS_SECRET_ACCESS_KEY = ""
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 UPLOADS_DIRECT = True
+
+# Websocket tests run in one process: no Redis needed. (The real settings
+# build a redis:// URL from REDIS_HOST/REDIS_PORT, which tests do not set.)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}

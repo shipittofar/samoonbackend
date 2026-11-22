@@ -336,7 +336,9 @@ class MenuQrManagementAPITests(TestCase):
         response = self.client.post(
             f"/api/menu/branches/{uuid.uuid4()}/qr/enable/"
         )
-        self.assertEqual(response.status_code, 404)
+        # BranchNotFoundException is 400 across the API (same as every other
+        # branch_not_found test); only a non-UUID path is a routing 404.
+        self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"]["code"], "branch_not_found")
 
     def test_non_uuid_branch_is_not_routed(self):

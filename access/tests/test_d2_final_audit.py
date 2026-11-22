@@ -159,6 +159,7 @@ class MigrationAuditTests(TestCase):
         "0015_seed_rbac_manage_roles_permission",
         "0016_remove_manage_roles_from_owner",
         "0017_alter_permissionaudit_action",
+        "0018_lifecycle_fk_safety",
     )
 
     def test_access_migration_chain_is_linear_to_head(self):

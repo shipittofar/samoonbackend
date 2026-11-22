@@ -13,7 +13,7 @@ from addresses.models import Address, AddressAuditLog, AddressType
 from addresses.services.address_domain_service import AddressDomainService
 from menu.models import MenuCategory, MenuItem
 from orders.models import Order, OrderDeliveryAddress, OrderType, PaymentMethod
-from tenants.models import Branch, Owner, Tenant
+from tenants.models import Branch, Owner, Tenant, TenantStatus
 
 
 def make_user(**kwargs):
@@ -39,7 +39,10 @@ def auth_client(user):
 
 def make_branch(*, delivery_enabled=True, delivery_radius=50):
     owner = Owner.objects.create(user=make_user())
-    tenant = Tenant.objects.create(owner=owner, name=f"Tenant {uuid.uuid4().hex[:6]}")
+    # New tenants start INACTIVE and cannot take orders; checkout needs an active one.
+    tenant = Tenant.objects.create(
+        owner=owner, name=f"Tenant {uuid.uuid4().hex[:6]}", status=TenantStatus.ACTIVE, is_active=True
+    )
     branch = Branch.objects.create(
         tenant=tenant,
         name="Main",
