@@ -8,6 +8,8 @@ class PlatformSetting(models.Model):
     Keys used so far:
       - ``homepage.hero``: the marketplace home page hero (background images
         and slideshow timing), see services/homepage_hero.py.
+      - ``config:<fieldId>``: a platform-level override of one Platform
+        Configuration field (frontend src/config), see services/platform_config.py.
     """
 
     key = models.CharField(max_length=100, unique=True)
@@ -26,3 +28,26 @@ class PlatformSetting(models.Model):
 
     def __str__(self) -> str:
         return self.key
+
+class PlatformSettingChange(models.Model):
+    """Who changed a platform setting, when, from what, to what, and why."""
+
+    key = models.CharField(max_length=100, db_index=True)
+    previous_value = models.JSONField(null=True, blank=True)
+    # null = the override was removed (back to the built-in default).
+    new_value = models.JSONField(null=True, blank=True)
+    reason = models.CharField(max_length=500, blank=True)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    changed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.key} @ {self.changed_at:%Y-%m-%d %H:%M}"

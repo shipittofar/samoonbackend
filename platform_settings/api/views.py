@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from superadmin.api.permissions import IsPlatformSuperuser
-from platform_settings.services import homepage_hero
+from platform_settings.services import homepage_hero, platform_config
 
 
 @extend_schema(tags=["Platform - Homepage"])
@@ -33,3 +33,51 @@ class HomepageHeroView(APIView):
 
     def put(self, request):
         return Response(homepage_hero.save_hero(user=request.user, data=request.data))
+
+
+class _PublicReadMixin:
+    """GET is public and never authenticates (a stale token must not break
+    the site); writes are platform-superuser only."""
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return [AllowAny()]
+        return [IsPlatformSuperuser()]
+
+    def perform_authentication(self, request):
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return
+        super().perform_authentication(request)
+
+
+@extend_schema(tags=["Platform - Configuration"])
+class PlatformConfigView(_PublicReadMixin, APIView):
+    """Platform-level overrides of Platform Configuration fields.
+
+    GET (public): ``{"overrides": {fieldId: value}}``.
+    PUT (superusers): ``{"changes": [{"fieldId", "value"} | {"fieldId", "reset": true}], "reason"}``
+    applies all changes or none, logs each, and returns the new overrides.
+    """
+
+    def get(self, request):
+        response = Response({"overrides": platform_config.get_overrides()})
+        response["Cache-Control"] = "no-store"
+        return response
+
+    def put(self, request):
+        return Response({"overrides": platform_config.save_overrides(user=request.user, data=request.data)})
+
+
+@extend_schema(tags=["Platform - Configuration"])
+class PlatformConfigHistoryView(APIView):
+    """Change log (superusers only). ``?field=<fieldId>&limit=100``."""
+
+    permission_classes = [IsPlatformSuperuser]
+
+    def get(self, request):
+        try:
+            limit = int(request.query_params.get("limit", 100))
+        except ValueError:
+            limit = 100
+        field_id = request.query_params.get("field") or None
+        return Response({"results": platform_config.history(field_id=field_id, limit=limit)})
