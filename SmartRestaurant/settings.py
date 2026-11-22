@@ -136,6 +136,7 @@ INSTALLED_APPS = [
     'website_builder.apps.WebsiteBuilderConfig',
     'uploads.apps.UploadsConfig',
     'superadmin.apps.SuperadminConfig',
+    'platform_settings.apps.PlatformSettingsConfig',
 ]
 
 MIDDLEWARE = [
