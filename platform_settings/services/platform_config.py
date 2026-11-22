@@ -17,7 +17,7 @@ import re
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
-from platform_settings.models import PlatformSetting, PlatformSettingChange
+from platform_settings.models import PlatformSetting, PlatformSettingChange, TenantConfigOverride
 
 PREFIX = "config:"
 FIELD_ID_RE = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$")
@@ -103,8 +103,55 @@ def save_overrides(*, user, data) -> dict:
     return get_overrides()
 
 
-def history(*, field_id: str | None = None, limit: int = 100) -> list[dict]:
+def get_tenant_overrides(tenant_id) -> dict:
+    """{fieldId: value} a business set for its tenant-level fields."""
+    return dict(TenantConfigOverride.objects.filter(tenant_id=tenant_id).values_list("field_id", "value"))
+
+
+def save_tenant_overrides(*, user, tenant, data) -> dict:
+    """Same request shape and rules as save_overrides, for one business."""
+    changes, reason = _clean_changes(data)
+    actor = user if getattr(user, "is_authenticated", False) else None
+    with transaction.atomic():
+        field_ids = [field_id for field_id, _, _ in changes]
+        existing = {
+            row.field_id: row
+            for row in TenantConfigOverride.objects.select_for_update().filter(tenant=tenant, field_id__in=field_ids)
+        }
+        log = []
+        for field_id, value, reset in changes:
+            row = existing.get(field_id)
+            previous = row.value if row else None
+            if reset:
+                if row is None:
+                    continue
+                row.delete()
+            else:
+                if row is not None and row.value == value:
+                    continue
+                if row is None:
+                    row = TenantConfigOverride(tenant=tenant, field_id=field_id)
+                row.value = value
+                row.updated_by = actor
+                row.save()
+            log.append(
+                PlatformSettingChange(
+                    key=PREFIX + field_id,
+                    tenant=tenant,
+                    previous_value=previous,
+                    new_value=value,
+                    reason=reason,
+                    changed_by=actor,
+                )
+            )
+        PlatformSettingChange.objects.bulk_create(log)
+    return get_tenant_overrides(tenant.id)
+
+
+def history(*, field_id: str | None = None, limit: int = 100, tenant_id=None) -> list[dict]:
+    """Platform-wide changes, or one business's changes when tenant_id is given."""
     qs = PlatformSettingChange.objects.filter(key__startswith=PREFIX).select_related("changed_by")
+    qs = qs.filter(tenant_id=tenant_id) if tenant_id else qs.filter(tenant__isnull=True)
     if field_id:
         qs = qs.filter(key=PREFIX + field_id)
     out = []

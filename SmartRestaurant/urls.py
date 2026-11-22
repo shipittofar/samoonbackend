@@ -66,6 +66,7 @@ urlpatterns = [
 
     path('qr/<slug:code>/', include(('tenants.api.urls_qr', 'qr'), namespace='qr')),
     path('api/public/', include('tenants.api.urls_public', namespace='public')),
+    path('api/tenants/<uuid:tenant_id>/', include('platform_settings.api.urls_tenant', namespace='tenant_config')),
     path('api/tenants/', include('tenants.api.urls', namespace='tenants')),
     # Platform superuser console API
     path('api/superadmin/', include('superadmin.api.urls', namespace='superadmin')),

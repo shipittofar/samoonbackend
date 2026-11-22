@@ -37,6 +37,14 @@ class PlatformSettingChange(models.Model):
     # null = the override was removed (back to the built-in default).
     new_value = models.JSONField(null=True, blank=True)
     reason = models.CharField(max_length=500, blank=True)
+    # Set for a business-level change (TenantConfigOverride); empty for platform-wide.
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
     changed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -51,3 +59,31 @@ class PlatformSettingChange(models.Model):
 
     def __str__(self) -> str:
         return f"{self.key} @ {self.changed_at:%Y-%m-%d %H:%M}"
+
+
+class TenantConfigOverride(models.Model):
+    """A business's own value for a tenant-level Platform Configuration field
+    (frontend src/config: fields whose inheritance level is "tenant", e.g. the
+    default language, currency or theme colours). Edited by the business's
+    settings managers; secrets are never stored here."""
+
+    tenant = models.ForeignKey("tenants.Tenant", on_delete=models.CASCADE, related_name="config_overrides")
+    field_id = models.CharField(max_length=95)
+    value = models.JSONField(null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["tenant_id", "field_id"]
+        constraints = [
+            models.UniqueConstraint(fields=["tenant", "field_id"], name="uniq_tenant_config_override"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tenant_id}: {self.field_id}"
