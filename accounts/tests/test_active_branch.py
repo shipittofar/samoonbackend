@@ -9,7 +9,7 @@ from access.models import Role, StaffMembership
 from access.tests.helpers import create_canonical_assignment
 from accounts.models import User
 from accounts.services.workspace_bll import workspace_bll
-from tenants.models import Branch, Owner, Tenant
+from tenants.models import Branch, Owner, Tenant, TenantStatus
 from tenants.services import BranchBusinessLogicLayer
 
 
@@ -35,7 +35,8 @@ def make_owner_user():
 
 
 def make_tenant(owner, **kwargs):
-    defaults = {"name": f"Tenant {uuid.uuid4().hex[:6]}"}
+    # Active, like a real tenant with branches (a new INACTIVE tenant grants no RBAC).
+    defaults = {"name": f"Tenant {uuid.uuid4().hex[:6]}", "status": TenantStatus.ACTIVE, "is_active": True}
     defaults.update(kwargs)
     return Tenant.objects.create(owner=owner, **defaults)
 
@@ -211,7 +212,10 @@ class SwitchActiveBranchAPITests(TestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, 400)
+        # Another owner's branch: the user is not a member of that tenant.
+        self.assertEqual(response.status_code, 403)
+        user.refresh_from_db()
+        self.assertIsNone(user.active_branch_id)
 
     def test_staff_selected_scope_can_only_switch_assigned_branch(self):
         user = make_user()

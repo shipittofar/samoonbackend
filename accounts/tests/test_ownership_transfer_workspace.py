@@ -293,7 +293,7 @@ class ActiveTenantBranchConsistencyTests(TestCase):
         tenant_a = make_tenant(owner, name="A")
         tenant_b = make_tenant(owner, name="B")
         branch_a = make_branch(tenant_a)
-        make_branch(tenant_b)
+        branch_b = make_branch(tenant_b)
         user.active_tenant = tenant_a
         user.save(update_fields=["active_tenant_id"])
 
@@ -328,9 +328,11 @@ class ActiveTenantBranchConsistencyTests(TestCase):
         self.assertEqual(diagnostics["resolved_branch_id"], str(branch_a.id))
         self.assertEqual(diagnostics["resolved_branch_tenant_id"], str(tenant_a.id))
         self.assertFalse(diagnostics["ids_equal"])
+        # The workspace stays where the tenant switch put it: tenant B on its
+        # (fallback) branch — the stale request changed nothing.
         user.refresh_from_db()
         self.assertEqual(user.active_tenant_id, tenant_b.id)
-        self.assertIsNone(user.active_branch_id)
+        self.assertEqual(user.active_branch_id, branch_b.id)
         self.assertTrue(
             any("active_branch_tenant_mismatch" in message for message in logs.output)
         )
@@ -415,8 +417,7 @@ class ActiveTenantBranchConsistencyTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        diagnostics = response.json().get("error", {}).get("diagnostics")
-        self.assertIsNone(diagnostics)
+        self.assertEqual(response.content, b"")  # 204: no body, so no error diagnostics
         user.refresh_from_db()
         self.assertEqual(user.active_tenant_id, tenant.id)
         self.assertEqual(user.active_branch_id, branch.id)

@@ -285,8 +285,13 @@ class TenantDataAccessLayer:
 
     @staticmethod
     def activate_tenant(tenant: Tenant) -> Tenant:
+        # Mirror of inactive_tenant(), which also clears is_active: without
+        # restoring it, a tenant whose last branch was deleted and then re-added
+        # stayed is_active=False, so RBAC gave its owner no permissions at all
+        # (console menu empty) and it never reappeared in public listings.
         tenant.status = TenantStatus.ACTIVE
-        tenant.save(update_fields=["status", "updated_at"])
+        tenant.is_active = True
+        tenant.save(update_fields=["status", "is_active", "updated_at"])
 
         owner_user_id = getattr(tenant, "owner_user_id", None) or tenant.owner.user_id
         transaction.on_commit(

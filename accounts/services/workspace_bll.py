@@ -173,6 +173,12 @@ def _clean_workspace_fields_or_raise(
 class WorkspaceBusinessLogicLayer:
     @staticmethod
     def user_can_access_branch(user: User, branch: Branch) -> bool:
+        # A deleted branch (is_active=False, see BranchDataAccessLayer.inactive_branch)
+        # is nobody's workspace: without this, deleting the branch an owner was
+        # working in left the console pointing at it. (Maintenance branches
+        # stay selectable: the owner still manages them.)
+        if not branch.is_active:
+            return False
         if user.is_superuser and user.is_active:
             return True
         owner_profile = getattr(user, "owner_profile", None)
@@ -275,8 +281,12 @@ class WorkspaceBusinessLogicLayer:
             and _same_uuid(user_ref.active_tenant_id, coerced_tenant_id)
         ):
             active_branch = user_ref.active_branch
-            if active_branch and WorkspaceBusinessLogicLayer.user_can_access_branch(
-                user_ref, active_branch
+            # The stored pointer can be inconsistent (branch of another tenant);
+            # only a branch of this tenant can be its workspace branch.
+            if (
+                active_branch
+                and _same_uuid(active_branch.tenant_id, coerced_tenant_id)
+                and WorkspaceBusinessLogicLayer.user_can_access_branch(user_ref, active_branch)
             ):
                 return active_branch
 
@@ -435,6 +445,7 @@ class WorkspaceBusinessLogicLayer:
     @staticmethod
     @transaction.atomic
     def set_active_branch(user: User, branch: Branch) -> None:
+        WorkspaceBusinessLogicLayer._assert_branch_in_active_tenant(user, branch)
         WorkspaceBusinessLogicLayer.activate_workspace(
             user,
             branch.tenant_id,
@@ -532,6 +543,26 @@ class WorkspaceBusinessLogicLayer:
                     ).update(preferred_branch_id=None)
 
     @staticmethod
+    def _assert_branch_in_active_tenant(user: User, branch: Branch) -> None:
+        """Within an established workspace a branch switch never changes tenant.
+
+        Reads the user's active tenant from the database (the request's user
+        object may be stale) and rejects a branch of another tenant with 400
+        active_branch_tenant_mismatch — e.g. a request still carrying the
+        previous tenant's branch after a tenant switch must not silently move
+        the workspace back. (The console only sends branches of the active
+        tenant.) No active tenant: nothing to protect.
+        """
+        current = User.objects.only("id", "active_tenant_id", "active_branch_id").get(pk=user.pk)
+        if current.active_tenant_id and not _same_uuid(branch.tenant_id, current.active_tenant_id):
+            _raise_active_branch_tenant_mismatch(
+                user=current,
+                requested_branch_id=branch.id,
+                resolved_branch=branch,
+                raise_source="set_active_branch_tenant_id_mismatch",
+            )
+
+    @staticmethod
     def switch_active_branch(user: User, branch_id) -> None:
         branch = (
             Branch.objects.filter(id=_coerce_uuid(branch_id))
@@ -546,6 +577,13 @@ class WorkspaceBusinessLogicLayer:
         valid_ids = membership_service.get_valid_tenant_ids(user)
         if str(branch.tenant_id) not in valid_ids:
             raise NotAMemberOfBranchException()
+
+        # No workspace yet (no active branch): this switch establishes it and
+        # may pick the branch's tenant. Once a branch is active, switching only
+        # moves within the active tenant (see _assert_branch_in_active_tenant).
+        current = User.objects.only("id", "active_tenant_id", "active_branch_id").get(pk=user.pk)
+        if current.active_tenant_id and current.active_branch_id:
+            WorkspaceBusinessLogicLayer._assert_branch_in_active_tenant(current, branch)
 
         WorkspaceBusinessLogicLayer.activate_workspace(
             user,

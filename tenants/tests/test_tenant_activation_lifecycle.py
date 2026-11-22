@@ -151,6 +151,23 @@ class TenantActivationLifecycleTests(TestCase):
         self.assertEqual(tenant.status, TenantStatus.INACTIVE)
         assert_activation_invariant(self, tenant)
 
+    def test_readding_a_branch_restores_owner_access(self):
+        """Deleting the last branch clears is_active; adding one back must restore
+        it, or RBAC gives the owner no permissions (empty console menu)."""
+        from access.services.rbac_bll import rbac_bll
+
+        tenant = Tenant.objects.get(id=self._create_tenant_via_api().data["id"])
+        first = self._create_branch_via_api(tenant.id)
+        self._delete_branch_via_api(tenant.id, first.data["id"])
+        tenant.refresh_from_db()
+        self.assertFalse(tenant.is_active)
+
+        self._create_branch_via_api(tenant.id, name="Again")
+        tenant.refresh_from_db()
+        self.assertEqual(tenant.status, TenantStatus.ACTIVE)
+        self.assertTrue(tenant.is_active)
+        self.assertIn("menu.manage", rbac_bll.get_effective_permissions(user=tenant.owner.user, tenant=tenant))
+
     def test_delete_one_of_two_branches_keeps_tenant_active(self):
         create_response = self._create_tenant_via_api()
         tenant = Tenant.objects.get(id=create_response.data["id"])
