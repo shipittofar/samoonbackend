@@ -120,10 +120,7 @@ class AccountRestoreConflict(Exception):
 
 
 def _revoke_all_tokens(user: User) -> None:
-    """Blacklist every refresh token of a deleted account."""
-    try:
-        from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
-    except Exception:  # blacklist app not installed
-        return
-    for token in OutstandingToken.objects.filter(user=user):
-        BlacklistedToken.objects.get_or_create(token=token)
+    """Sign a deleted account out everywhere (refresh and access tokens)."""
+    from accounts.services.session_revocation import revoke_all_sessions
+
+    revoke_all_sessions(user)

@@ -305,6 +305,7 @@ class MenuItemUpdateView(UpdateAPIView):
     parameters=[TagFilterQuerySerializer],
 )
 class MenuItemListView(MenuPublicTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = ItemPagination
 
@@ -326,6 +327,7 @@ class MenuItemListView(MenuPublicTenantSummaryMixin, ListAPIView):
     parameters=[TagFilterQuerySerializer],
 )
 class MenuItemAliasListView(MenuPublicTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = ItemPagination
 
@@ -388,6 +390,7 @@ class MenuItemCollectionAliasView(APIView):
     parameters=[TagFilterQuerySerializer],
 )
 class MenuItemFeaturedAliasView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
         branch_id = _resolve_branch_id(request, kwargs)
         items = menu_bll.get_featured_items(
@@ -406,6 +409,7 @@ class MenuItemFeaturedAliasView(APIView):
     parameters=[TagFilterQuerySerializer],
 )
 class MenuItemPopularAliasView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
         branch_id = _resolve_branch_id(request, kwargs)
         items = menu_bll.get_popular_items(
@@ -424,6 +428,7 @@ class MenuItemPopularAliasView(APIView):
     parameters=[MenuItemSearchQuerySerializer],
 )
 class MenuItemSearchAliasView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
         branch_id = _resolve_branch_id(request, kwargs)
         query = request.query_params.get("q", "")
@@ -444,6 +449,7 @@ class MenuItemSearchAliasView(APIView):
     parameters=[TagFilterQuerySerializer],
 )
 class MenuItemRelatedAliasView(APIView):
+    permission_classes = [AllowAny]
     def get(self, request, *args, **kwargs):
         branch_id = _resolve_branch_id(request, kwargs)
         items = menu_bll.get_related_items(
@@ -531,6 +537,7 @@ class MenuItemDetailAliasView(APIView):
 
 @extend_schema(tags=["Menu - Items"], summary="detail Menu Items")
 class MenuItemDetailView(RetrieveAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
 
     def retrieve(self, request, *args, **kwargs):
@@ -585,6 +592,7 @@ class ExtraCreateView(CreateAPIView):
     description="Retrieve a paginated list of extras for the specified branch."
 )
 class ExtraListView(ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = ExtraOutputSerializer
     pagination_class = ExtraPagination
 
@@ -602,6 +610,7 @@ class ExtraListView(ListAPIView):
     description="Retrieve the details of a specific extra."
 )
 class ExtraDetailView(RetrieveAPIView):
+    permission_classes = [AllowAny]
     serializer_class = ExtraOutputSerializer
 
     def retrieve(self, request, *args, **kwargs):
@@ -797,6 +806,7 @@ class MenuItemExtraCreateView(CreateAPIView):
     description="Retrieve all extras assigned to a specific menu item."
 )
 class MenuItemExtraListView(ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemExtraOutputSerializer
 
     def get_queryset(self):

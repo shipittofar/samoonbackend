@@ -120,6 +120,9 @@ def add_superuser(
     if password:
         user.set_password(password)
         user.save(update_fields=["password"])
+        from accounts.services.session_revocation import revoke_all_sessions
+
+        revoke_all_sessions(user)  # a new password signs old sessions out
     elif not user.has_usable_password():
         raise SuperuserError("A password is required: the Django admin signs in with phone + password.")
 

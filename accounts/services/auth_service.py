@@ -10,12 +10,13 @@ from core.exceptions.account import (
     InvalidCredentialsException,
     PasswordAlreadySetException,
     PasswordNotSetException,
-    UserNotFoundException,
     IdentifierNotVerifiedException,
     UserAlreadyExistsException,
     InvalidTokenException,
 )
 from accounts.services import OTPBusinessLogiclayer
+from accounts.services.session_revocation import revoke_all_sessions
+from core.exceptions import OTPInvalidException, OTPRequestLimitExceededException
 
 user_dal = UserDataAccessLayer()
 otp_bll = OTPBusinessLogiclayer()
@@ -116,7 +117,9 @@ class PasswordAuthBusinessLogicLayer:
         user.save(update_fields=["password"])
 
     @staticmethod
-    def change_password(user: User, old_password: str, new_password: str) -> None:
+    def change_password(user: User, old_password: str, new_password: str) -> dict:
+        """Change the password and sign out every other session (a stolen
+        token stops working). Returns fresh tokens for the caller's session."""
         if not user.has_usable_password():
             raise PasswordNotSetException()
 
@@ -125,30 +128,39 @@ class PasswordAuthBusinessLogicLayer:
 
         user.set_password(new_password)
         user.save(update_fields=["password"])
+        revoke_all_sessions(user)
+        return auth_service.issue_tokens(user)
 
 
 class ForgetPasswordBusinessLogicLayer:
 
     @staticmethod
     def request_reset(phone_number: str) -> None:
-        user = user_dal.get_by_phone(phone_number)
-        if user is None:
-            raise UserNotFoundException()
-        if not user.is_active:
-            raise UserInactiveException()
+        """Send a reset code if the number belongs to an active account.
 
-        otp_bll.generate(identifier=phone_number, otp_type=OTPType.FORGET_PASSWORD)
+        The caller always gets the same answer, whether or not the account
+        exists, is disabled or has hit the per-number code limit, so this
+        endpoint cannot be used to find out which numbers are registered.
+        """
+        user = user_dal.get_by_phone(phone_number)
+        if user is None or not user.is_active:
+            return
+        try:
+            otp_bll.generate(identifier=phone_number, otp_type=OTPType.FORGET_PASSWORD)
+        except OTPRequestLimitExceededException:
+            return
 
     @staticmethod
     def confirm_reset(phone_number: str, code: str, new_password: str) -> User:
+        """Unknown or disabled accounts get the same "invalid code" error as a
+        wrong code. A successful reset signs the account out everywhere."""
         user = user_dal.get_by_phone(phone_number)
-        if user is None:
-            raise UserNotFoundException()
-        if not user.is_active:
-            raise UserInactiveException()
+        if user is None or not user.is_active:
+            raise OTPInvalidException()
 
         otp_bll.verify(identifier=phone_number, code=code, otp_type=OTPType.FORGET_PASSWORD)
 
         user.set_password(new_password)
         user.save(update_fields=["password"])
+        revoke_all_sessions(user)
         return user

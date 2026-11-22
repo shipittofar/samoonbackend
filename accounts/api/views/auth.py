@@ -1,5 +1,5 @@
 from rest_framework import status, serializers
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
@@ -76,6 +76,7 @@ account_verification_bll = AccountVerificationBusinessLogicLayer()
     description="Generate and send a one-time password to a phone number or email for login/signup.",
 )
 class SendOTPView(CreateAPIView):
+    permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_otp_send"
     serializer_class = SendOTPInputSerializer
@@ -96,6 +97,7 @@ class SendOTPView(CreateAPIView):
     description="Verify the sent OTP code. If no account exists for that identifier, a new account is created and tokens are issued.",
 )
 class VerifyOTPView(CreateAPIView):
+    permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_otp_verify"
     serializer_class = VerifyOTPInputSerializer
@@ -131,6 +133,7 @@ class VerifyOTPView(CreateAPIView):
                 "(whichever was verified via OTP) plus first_name/last_name.",
 )
 class RegisterUserView(CreateAPIView):
+    permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_register"
     serializer_class = RegisterInputSerializer
@@ -177,6 +180,7 @@ class LogoutView(CreateAPIView):
                 "Provide exactly one of email or phone_number.",
 )
 class PasswordLoginView(CreateAPIView):
+    permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_password_login"
     serializer_class = PasswordLoginInputSerializer
@@ -246,12 +250,13 @@ class ChangePasswordView(CreateAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        password_auth_bll.change_password(
+        # Every other session is signed out; this one continues with new tokens.
+        tokens = password_auth_bll.change_password(
             user=request.user,
             old_password=data["old_password"],
             new_password=data["new_password"],
         )
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(tokens, status=status.HTTP_200_OK)
 
 
 @extend_schema(
@@ -260,6 +265,7 @@ class ChangePasswordView(CreateAPIView):
     description="Send a verification code to the given phone number to recover a forgotten password.",
 )
 class ForgetPasswordRequestView(CreateAPIView):
+    permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_password_reset"
     serializer_class = ForgetPasswordRequestInputSerializer
@@ -277,6 +283,7 @@ class ForgetPasswordRequestView(CreateAPIView):
     description="Verify the sent code and set a new password.",
 )
 class ForgetPasswordConfirmView(CreateAPIView):
+    permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "auth_password_reset"
     serializer_class = ForgetPasswordConfirmInputSerializer

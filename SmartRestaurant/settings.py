@@ -231,7 +231,15 @@ REST_FRAMEWORK = {
 
     # Authentication
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # simplejwt + rejects access tokens issued before a password change.
+        'accounts.authentication.RevocableJWTAuthentication',
+    ),
+    # Deny by default: an endpoint without its own permission_classes needs a
+    # signed-in user. Public endpoints (storefront menu, branch info, sign-in,
+    # health) say AllowAny explicitly, so forgetting a permission on a new
+    # view can no longer expose it to anonymous callers.
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
     ),
     # Requests arrive through exactly one reverse proxy (the frontend nginx), so
     # the client IP is the last hop of X-Forwarded-For. Without this, a client

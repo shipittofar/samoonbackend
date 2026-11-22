@@ -1,3 +1,4 @@
+from rest_framework.permissions import AllowAny
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from drf_spectacular.utils import extend_schema
@@ -42,6 +43,7 @@ MenuBrowseTenantSummaryMixin = MenuPublicTenantSummaryMixin
     parameters=[TagFilterQuerySerializer],
 )
 class CategoryWithItemsListView(ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuCategoryWithItemsOutputSerializer
     pagination_class = MenuPagination
 
@@ -66,6 +68,7 @@ class CategoryWithItemsListView(ListAPIView):
     parameters=[TagFilterQuerySerializer],
 )
 class PopularItemListView(MenuBrowseTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = MenuPagination
 
@@ -83,6 +86,7 @@ class PopularItemListView(MenuBrowseTenantSummaryMixin, ListAPIView):
     parameters=[TagFilterQuerySerializer],
 )
 class FeaturedItemListView(MenuBrowseTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = MenuPagination
 
@@ -100,6 +104,7 @@ class FeaturedItemListView(MenuBrowseTenantSummaryMixin, ListAPIView):
     parameters=[TagFilterQuerySerializer],
 )
 class ActiveItemListView(MenuBrowseTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = MenuPagination
 
@@ -117,6 +122,7 @@ class ActiveItemListView(MenuBrowseTenantSummaryMixin, ListAPIView):
     parameters=[ItemPriceQuerySerializer],
 )
 class ItemByPriceListView(MenuBrowseTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = MenuPagination
 
@@ -141,6 +147,7 @@ class ItemByPriceListView(MenuBrowseTenantSummaryMixin, ListAPIView):
     parameters=[ItemPreparationTimeQuerySerializer],
 )
 class ItemByPreparationTimeListView(MenuBrowseTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = MenuPagination
 
@@ -165,6 +172,7 @@ class ItemByPreparationTimeListView(MenuBrowseTenantSummaryMixin, ListAPIView):
     parameters=[ItemCalorieQuerySerializer],
 )
 class ItemByCalorieListView(MenuBrowseTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = MenuPagination
 
@@ -189,6 +197,7 @@ class ItemByCalorieListView(MenuBrowseTenantSummaryMixin, ListAPIView):
     parameters=[ItemDiscountQuerySerializer],
 )
 class ItemByDiscountListView(MenuBrowseTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuItemOutputSerializer
     pagination_class = MenuPagination
 

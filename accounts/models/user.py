@@ -61,6 +61,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     # up again); the old values are kept here for support and for restoring.
     deleted_phone_number = models.CharField(max_length=20, blank=True, null=True)
     deleted_email = models.EmailField(blank=True, null=True)
+    # Access tokens issued before this moment are rejected (password change /
+    # reset, account deletion). See accounts/services/session_revocation.py.
+    tokens_valid_after = models.DateTimeField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

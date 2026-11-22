@@ -5,7 +5,7 @@ from rest_framework.generics import (
     ListAPIView,
     DestroyAPIView,
 )
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
@@ -99,6 +99,7 @@ class TenantSettingsPatchAPIView(APIView):
 @extend_schema(tags=["Tenant - Tenant"], summary="retrieve Tenant (public catalog)")
 class TenantRetrieveAPIView(RetrieveAPIView):
     """Public tenant detail — hidden/non-listable tenants return 404."""
+    permission_classes = [AllowAny]
 
     def retrieve(self, request, *args, **kwargs):
         tenant = tenant_bll.get_public_tenant(tenant_id=kwargs["tenant_id"])
@@ -209,6 +210,7 @@ class BranchRetrieveAPIView(RetrieveAPIView):
     load branch details even when the tenant is hidden from public catalogs.
     Tenant visibility/usability is returned via the nested ``tenant`` object.
     """
+    permission_classes = [AllowAny]
 
     def retrieve(self, request, *args, **kwargs):
         branch = branch_bll.get_branch(
@@ -224,6 +226,7 @@ class BranchListAPIView(ListAPIView):
 
     Not filtered by public catalog rules — see ``BranchRetrieveAPIView``.
     """
+    permission_classes = [AllowAny]
     serializer_class = BranchResponseSerializer
     pagination_class = DefaultPagination
 
@@ -296,6 +299,7 @@ class BranchConsoleUpdateAPIView(APIView):
 
 @extend_schema(tags=["Tenant - Branch"], summary="list all Branches (public)")
 class BranchGlobalListAPIView(ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = BranchResponseSerializer
     pagination_class = DefaultPagination
 
@@ -306,6 +310,7 @@ class BranchGlobalListAPIView(ListAPIView):
 @extend_schema(tags=["Tenant - Branch"], summary="retrieve Branch (public)")
 class BranchGlobalRetrieveAPIView(RetrieveAPIView):
 
+    permission_classes = [AllowAny]
     def retrieve(self, request, *args, **kwargs):
         branch = branch_bll.get_branch_public(branch_id=kwargs["branch_id"])
         return Response(BranchResponseSerializer(branch, context={"request": request}).data)

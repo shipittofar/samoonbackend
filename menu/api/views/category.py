@@ -117,6 +117,7 @@ class MenuCategoryUpdateView(UpdateAPIView):
 
 @extend_schema(tags=["Menu - Categories"], summary="list Menu Categories")
 class MenuCategoryListView(MenuPublicTenantSummaryMixin, ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuCategoryOutputSerializer
     pagination_class = CategoryPagination
 
@@ -128,6 +129,7 @@ class MenuCategoryListView(MenuPublicTenantSummaryMixin, ListAPIView):
 
 @extend_schema(tags=["Menu - Categories"], summary="detail Menu Categories")
 class MenuCategoryDetailView(RetrieveAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuCategoryOutputSerializer
 
     def retrieve(self, request, *args, **kwargs):
@@ -158,6 +160,7 @@ class MenuCategoryDeleteView(DestroyAPIView):
 
 @extend_schema(tags=["Menu - Categories"], summary="list ALL Menu Categories (unfiltered, all tenants/branches)")
 class MenuCategoryAllListView(ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = MenuCategoryOutputSerializer
     pagination_class = CategoryPagination
 

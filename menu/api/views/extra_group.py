@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from menu.authorization.branch_menu import (
     PublicReadBranchMenuWriteMixin,
     RequireBranchMenuManagePermission,
@@ -69,6 +69,7 @@ class ExtraGroupCreateView(CreateAPIView):
     description="Retrieve a paginated list of extra groups for the specified branch.",
 )
 class ExtraGroupListView(ListAPIView):
+    permission_classes = [AllowAny]
     serializer_class = ExtraGroupOutputSerializer
     pagination_class = ExtraGroupPagination
 
@@ -98,6 +99,7 @@ class ConsoleExtraGroupListView(ListAPIView):
     description="Retrieve the details of a specific extra group.",
 )
 class ExtraGroupDetailView(RetrieveAPIView):
+    permission_classes = [AllowAny]
     serializer_class = ExtraGroupOutputSerializer
 
     def retrieve(self, request, *args, **kwargs):

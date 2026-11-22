@@ -8,6 +8,8 @@ from django.contrib.auth.models import AnonymousUser
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import AccessToken
 
+from accounts.services.session_revocation import token_is_revoked
+
 User = get_user_model()
 
 
@@ -15,9 +17,12 @@ User = get_user_model()
 def get_user_from_token(token: str):
     try:
         validated_token = AccessToken(token)
-        return User.objects.get(id=validated_token["user_id"])
+        user = User.objects.get(id=validated_token["user_id"])
     except (TokenError, User.DoesNotExist):
         return AnonymousUser()
+    if not user.is_active or token_is_revoked(user, validated_token):
+        return AnonymousUser()
+    return user
 
 
 class JWTAuthMiddleware(BaseMiddleware):
