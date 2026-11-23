@@ -216,3 +216,49 @@ def staff_membership_changed(membership, type_: str, *, actor=None) -> None:
 @_safe
 def password_changed(user) -> None:
     notify(recipients=[user], type_="password_changed", actor=user, data={})
+
+
+# ── Wallet ───────────────────────────────────────────────────────────────────
+
+
+def _money(value) -> str:
+    """1234.5000 -> "1,234.5"; 200000.0000 -> "200,000"."""
+    from decimal import Decimal
+
+    d = Decimal(value).normalize()
+    text = f"{d:,f}"
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+@_safe
+def wallet_transaction(tx) -> None:
+    """Tell the customer whose wallet a ledger transaction touched."""
+    type_ = {
+        "order_payment": "wallet_payment",
+        "order_refund": "wallet_refund",
+        "topup": "wallet_topup",
+        "adjustment": "wallet_adjustment",
+    }.get(tx.kind)
+    if type_ is None:
+        return
+    for entry in tx.entries.select_related("account__user"):
+        account = entry.account
+        if account.kind != "customer" or account.user is None:
+            continue
+        order = tx.order
+        notify(
+            recipients=[account.user],
+            type_=type_,
+            actor=tx.created_by if tx.created_by_id != account.user_id else None,
+            data={
+                "amount": _money(abs(entry.amount)),
+                "signed_amount": ("+" if entry.amount > 0 else "−") + _money(abs(entry.amount)),
+                "currency": tx.currency,
+                "balance": _money(entry.balance_after),
+                "reason": tx.description if tx.kind == "adjustment" else "",
+                "order_number": getattr(order, "order_number", "") or "",
+                "transaction_id": str(tx.id),
+            },
+            link_id=getattr(order, "id", "") or tx.id,
+            link_href=f"/order/{order.id}/track" if order else "/dashboard/wallet",
+        )

@@ -164,6 +164,43 @@ TYPES: dict[str, NotificationType] = {
             "ar": "تمت إزالتك من فريق «{business}»",
         },
     ),
+    # ── Wallet ────────────────────────────────────────────────────────────
+    "wallet_payment": NotificationType(
+        category="payment", priority="normal", link_type="order",
+        title={"fa": "پرداخت از کیف پول", "en": "Paid from wallet", "ar": "دفع من المحفظة"},
+        message={
+            "fa": "{amount} {currency} برای سفارش #{order_number} از کیف پول شما کسر شد. موجودی: {balance} {currency}",
+            "en": "{amount} {currency} was paid from your wallet for order #{order_number}. Balance: {balance} {currency}",
+            "ar": "تم دفع {amount} {currency} من محفظتك للطلب #{order_number}. الرصيد: {balance} {currency}",
+        },
+    ),
+    "wallet_refund": NotificationType(
+        category="payment", priority="high", link_type="order",
+        title={"fa": "بازگشت وجه به کیف پول", "en": "Refund to wallet", "ar": "استرداد إلى المحفظة"},
+        message={
+            "fa": "{amount} {currency} بابت سفارش لغوشده‌ی #{order_number} به کیف پول شما برگشت. موجودی: {balance} {currency}",
+            "en": "{amount} {currency} for cancelled order #{order_number} was returned to your wallet. Balance: {balance} {currency}",
+            "ar": "أُعيد {amount} {currency} للطلب الملغى #{order_number} إلى محفظتك. الرصيد: {balance} {currency}",
+        },
+    ),
+    "wallet_topup": NotificationType(
+        category="payment", priority="normal",
+        title={"fa": "کیف پول شارژ شد", "en": "Wallet topped up", "ar": "تم شحن المحفظة"},
+        message={
+            "fa": "{amount} {currency} به کیف پول شما اضافه شد. موجودی: {balance} {currency}",
+            "en": "{amount} {currency} was added to your wallet. Balance: {balance} {currency}",
+            "ar": "تمت إضافة {amount} {currency} إلى محفظتك. الرصيد: {balance} {currency}",
+        },
+    ),
+    "wallet_adjustment": NotificationType(
+        category="payment", priority="high",
+        title={"fa": "تغییر موجودی کیف پول", "en": "Wallet balance changed", "ar": "تغيّر رصيد المحفظة"},
+        message={
+            "fa": "موجودی کیف پول شما {signed_amount} {currency} تغییر کرد ({reason}). موجودی: {balance} {currency}",
+            "en": "Your wallet balance changed by {signed_amount} {currency} ({reason}). Balance: {balance} {currency}",
+            "ar": "تغيّر رصيد محفظتك بمقدار {signed_amount} {currency} ({reason}). الرصيد: {balance} {currency}",
+        },
+    ),
     # ── Account security ──────────────────────────────────────────────────
     "password_changed": NotificationType(
         category="system", priority="urgent",

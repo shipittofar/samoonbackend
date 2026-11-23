@@ -126,6 +126,11 @@ class OrdersBusinessLogicLayer:
             from currencies.services import snapshot_order
 
             snapshot_order(order, validated_data.get("display_currency"))
+            if order.payment_method == PaymentMethod.WALLET:
+                # Same database transaction: not enough balance = no order.
+                from wallet.services import pay_order
+
+                pay_order(order, customer=customer)
 
             self.dal.create_status_history(order, OrderStatus.PENDING)
             schedule_console_order_changed(order)
@@ -223,11 +228,20 @@ class OrdersBusinessLogicLayer:
             self.dal.create_status_history(
                 order, OrderStatus.CANCELLED, note="Cancelled by customer"
             )
+            self._refund_wallet(order, actor=customer)
             schedule_console_order_changed(order)
             transaction.on_commit(lambda: notify_order_status_change(order))
             notification_events.order_status_changed(order, actor=customer)
 
         return self.dal.get_order_by_id(order.id)
+
+    @staticmethod
+    def _refund_wallet(order, *, actor=None) -> None:
+        """A cancelled order that was paid from the wallet gets its money back
+        (same database transaction as the cancellation; idempotent)."""
+        from wallet.services import refund_order
+
+        refund_order(order, actor=actor)
 
     def admin_cancel_order(self, *, order: Order) -> Order:
         """Cancel an order from Django Admin without requiring the customer actor."""
@@ -244,6 +258,7 @@ class OrdersBusinessLogicLayer:
             self.dal.create_status_history(
                 locked, OrderStatus.CANCELLED, note="Cancelled in Django Admin"
             )
+            self._refund_wallet(locked)
             schedule_console_order_changed(locked)
             transaction.on_commit(lambda: notify_order_status_change(locked))
             notification_events.order_status_changed(locked)
@@ -301,6 +316,8 @@ class OrdersBusinessLogicLayer:
 
             self.dal.update_order_fields(order, status=new_status)
             self.dal.create_status_history(order, new_status)
+            if new_status == OrderStatus.CANCELLED:
+                self._refund_wallet(order, actor=user)
             schedule_console_order_changed(order)
             transaction.on_commit(lambda: notify_order_status_change(order))
             notification_events.order_status_changed(order, actor=user)

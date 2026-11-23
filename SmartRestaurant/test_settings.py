@@ -32,6 +32,7 @@ REST_FRAMEWORK = {
             scope: "100000/minute"
             for scope in (
                 "auth_otp_send",
+                "wallet_topup",
                 "auth_otp_verify",
                 "auth_register",
                 "auth_password_login",

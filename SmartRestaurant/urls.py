@@ -73,6 +73,7 @@ urlpatterns = [
     path('api/platform/', include('platform_settings.api.urls', namespace='platform_settings')),
     path('api/notifications/', include(('notifications.api', 'notifications'), namespace='notifications')),
     path('api/currencies/', include(('currencies.api', 'currencies'), namespace='currencies')),
+    path('api/wallet/', include(('wallet.api', 'wallet'), namespace='wallet')),
     path('api/branches/', include('tenants.api.urls_branches', namespace='branches')),
     path('api/menu/', include('menu.api.urls', namespace='menu')),
 

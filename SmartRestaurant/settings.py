@@ -139,6 +139,7 @@ INSTALLED_APPS = [
     'platform_settings.apps.PlatformSettingsConfig',
     'notifications.apps.NotificationsConfig',
     'currencies.apps.CurrenciesConfig',
+    'wallet.apps.WalletConfig',
 ]
 
 MIDDLEWARE = [
@@ -252,6 +253,8 @@ REST_FRAMEWORK = {
         # Anonymous auth endpoints (per client IP): OTP SMS cost, code guessing,
         # password brute force, account enumeration.
         'auth_otp_send': '10/hour',
+        # Wallet top-ups: each start calls a payment gateway.
+        'wallet_topup': '30/hour',
         'auth_otp_verify': '30/hour',
         'auth_register': '10/hour',
         'auth_password_login': '20/hour',
