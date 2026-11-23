@@ -122,6 +122,10 @@ class OrdersBusinessLogicLayer:
             self._validate_minimum_order(branch, subtotal)
             self._apply_totals(order, tenant, order_type,
                                subtotal, discount_amount)
+            order.refresh_from_db()
+            from currencies.services import snapshot_order
+
+            snapshot_order(order, validated_data.get("display_currency"))
 
             self.dal.create_status_history(order, OrderStatus.PENDING)
             schedule_console_order_changed(order)

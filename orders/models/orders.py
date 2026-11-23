@@ -162,6 +162,14 @@ class Order(models.Model):
 
     discount_code = models.CharField(max_length=50, blank=True)
 
+    # What the customer saw: the order is paid in the business currency
+    # (Tenant.currency, the amounts above); these record the currency the
+    # customer chose to view prices in and the rates used, at order time.
+    currency = models.CharField(max_length=10, blank=True, default="")
+    display_currency = models.CharField(max_length=10, blank=True, default="")
+    display_total = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
+    exchange_rates = models.JSONField(default=dict, blank=True)
+
     notes = models.TextField(blank=True)
 
     estimated_time = models.PositiveIntegerField(

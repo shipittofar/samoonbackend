@@ -115,6 +115,10 @@ class OrderResponseSerializer(serializers.ModelSerializer):
             "tax",
             "service_charge",
             "total",
+            "currency",
+            "display_currency",
+            "display_total",
+            "exchange_rates",
             "notes",
             "items",
             "delivery_address",
@@ -138,6 +142,9 @@ class OrderListItemLightweightResponseSerializer(serializers.ModelSerializer):
             "status",
             "payment_status",
             "total",
+            "currency",
+            "display_currency",
+            "display_total",
             "created_at",
         ]
 
@@ -182,6 +189,9 @@ class OrderListItemResponseSerializer(serializers.ModelSerializer):
             "status",
             "payment_status",
             "total",
+            "currency",
+            "display_currency",
+            "display_total",
             "created_at",
             "items",
         ]

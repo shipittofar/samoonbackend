@@ -139,6 +139,9 @@ class MenuItem(WebPImageMixin, models.Model):
         max_digits=10,
         decimal_places=2,
     )
+    # The owner's own prices in other currencies, e.g. {"USD": "3.00"}.
+    # They win over conversion by exchange rate (currencies.services).
+    prices = models.JSONField(default=dict, blank=True)
 
     discount = models.DecimalField(
         max_digits=5,

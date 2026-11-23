@@ -223,6 +223,10 @@ class ApiTests(TestCase):
 
 
 class SocketTests(TransactionTestCase):
+    # Same as orders ConsoleWebsocketTests: without it, the flush at the end of
+    # this class breaks the next serialized_rollback class (content types).
+    serialized_rollback = True
+
     def test_new_notification_is_pushed_to_that_user_only(self):
         from SmartRestaurant.asgi import application
         from notifications.services import _create

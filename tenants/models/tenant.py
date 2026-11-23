@@ -227,7 +227,9 @@ class Branch(WebPImageMixin, models.Model):
 
     # --- locale ---
     time_zone = models.CharField(max_length=64, blank=True, default="UTC")
-    currency = models.CharField(max_length=10, blank=True, default="USD")
+    # The currency this business prices its menu in (a currencies.Currency code;
+    # IRT = Iranian toman, the platform base).
+    currency = models.CharField(max_length=10, blank=True, default="IRT")
     language = models.CharField(max_length=10, blank=True, default="en")
 
     # --- checkout (operational) ---

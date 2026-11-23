@@ -8,6 +8,8 @@ class MenuItemInputSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
     description = serializers.CharField(default="", allow_blank=True)
     price = serializers.DecimalField(max_digits=10, decimal_places=2)
+    # Optional prices in other currencies, e.g. {"USD": "3.00"} (see currencies.services).
+    prices = serializers.DictField(required=False, allow_empty=True)
     discount = serializers.DecimalField(
         max_digits=5, decimal_places=2, default=0, min_value=0
     )
@@ -30,6 +32,7 @@ class MenuItemUpdateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, required=False)
     description = serializers.CharField(allow_blank=True, required=False)
     price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    prices = serializers.DictField(required=False, allow_empty=True)
     discount = serializers.DecimalField(
         max_digits=5, decimal_places=2, required=False, min_value=0
     )

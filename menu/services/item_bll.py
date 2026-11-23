@@ -36,6 +36,16 @@ extra_group_dal = ExtraGroupDataAccessLayer()
 class ItemBusinessLogicLayer:
 
     @staticmethod
+    def _save_explicit_prices(item: MenuItem, prices: dict) -> None:
+        """Store the owner's per-currency prices (validated; the branch's own
+        currency is skipped — that is ``price``)."""
+        from currencies.services import base_code, clean_explicit_prices
+
+        source = (item.branch.currency if item.branch_id else "") or base_code()
+        item.prices = clean_explicit_prices(prices, source=source)
+        item.save(update_fields=["prices", "updated_at"])
+
+    @staticmethod
     def create_menu_item(
         branch_id,
         category_id,
@@ -52,6 +62,7 @@ class ItemBusinessLogicLayer:
         is_popular: bool = False,
         is_featured: bool = False,
         tag_ids: list | None = None,
+        prices: dict | None = None,
         user=None,
     ) -> MenuItem:
 
@@ -87,6 +98,8 @@ class ItemBusinessLogicLayer:
             is_featured=is_featured,
             tag_ids=tag_ids,
         )
+        if prices is not None:
+            ItemBusinessLogicLayer._save_explicit_prices(item, prices)
         if user is not None and (image is not None or image_asset_id is not None):
             from tenants.models import Branch
 
@@ -189,6 +202,7 @@ class ItemBusinessLogicLayer:
         extra_group_ids_provided: bool = False,
         image_asset_id=None,
         image_asset_id_provided: bool = False,
+        prices: dict | None = None,
         user=None,
     ) -> MenuItem:
 
@@ -255,6 +269,8 @@ class ItemBusinessLogicLayer:
             tag_ids=tag_ids,
             tag_ids_provided=tag_ids_provided,
         )
+        if prices is not None:
+            ItemBusinessLogicLayer._save_explicit_prices(updated_item, prices)
 
         if extra_group_ids_provided:
             MenuItemExtraGroupBusinessLogicLayer.assign_extra_groups_to_item(

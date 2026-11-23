@@ -138,6 +138,7 @@ INSTALLED_APPS = [
     'superadmin.apps.SuperadminConfig',
     'platform_settings.apps.PlatformSettingsConfig',
     'notifications.apps.NotificationsConfig',
+    'currencies.apps.CurrenciesConfig',
 ]
 
 MIDDLEWARE = [

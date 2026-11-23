@@ -41,6 +41,7 @@ class MenuItemOutputSerializer(serializers.ModelSerializer):
     preparation_time = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
+    currency = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
@@ -53,6 +54,8 @@ class MenuItemOutputSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "price",
+            "currency",
+            "prices",
             "discount",
             "discounted_price",
             "image",
@@ -131,6 +134,13 @@ class MenuItemOutputSerializer(serializers.ModelSerializer):
 
     def get_description(self, obj):
         return obj.description or ""
+
+    def get_currency(self, obj):
+        """The currency ``price`` is in: the branch's (platform base if unset)."""
+        from currencies.services import base_code
+
+        branch = getattr(obj, "branch", None)
+        return (getattr(branch, "currency", "") or base_code()) if branch is not None else base_code()
 
 
 class ExtraOutputSerializer(serializers.ModelSerializer):

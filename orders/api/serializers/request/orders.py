@@ -87,6 +87,9 @@ class OrderRequestSerializerBase(serializers.Serializer):
     items = OrderItemRequestSerializer(many=True)
     order_type = serializers.ChoiceField(choices=OrderType.choices)
     payment_method = serializers.ChoiceField(choices=PaymentMethod.choices)
+    # The currency the customer viewed prices in (recorded on the order with
+    # the rates used; the order is still charged in the business currency).
+    display_currency = serializers.CharField(max_length=10, required=False, allow_blank=True)
     delivery_address = DeliveryAddressRequestSerializer(
         required=False, allow_null=True
     )
