@@ -41,6 +41,13 @@ class MembershipBusinessLogicLayer:
 
         transaction.on_commit(_invalidate)
 
+    @staticmethod
+    def _notify_member(membership: StaffMembership, type_: str, *, actor_id=None) -> None:
+        from notifications import events as notification_events
+
+        actor = User.objects.filter(pk=actor_id or membership.invited_by_id).first() if (actor_id or membership.invited_by_id) else None
+        notification_events.staff_membership_changed(membership, type_, actor=actor)
+
     def create_membership(
         self,
         *,
@@ -68,6 +75,7 @@ class MembershipBusinessLogicLayer:
                             update_fields=["status", "invited_by", "joined_at", "updated_at"]
                         )
                         self._schedule_effective_permissions_invalidation(existing)
+                        self._notify_member(existing, "staff_created")
                         return existing
                     raise ValidationError(
                         {"user_id": "This user already has a membership for this tenant."}
@@ -81,6 +89,7 @@ class MembershipBusinessLogicLayer:
                     joined_at=timezone.now() if status == MembershipStatus.ACTIVE else None,
                 )
                 self._schedule_effective_permissions_invalidation(membership)
+                self._notify_member(membership, "staff_created")
                 return membership
         except IntegrityError as exc:
             raise ValidationError(
@@ -92,6 +101,7 @@ class MembershipBusinessLogicLayer:
             tenant_id=tenant_id, membership_id=membership_id
         )
 
+        previous_status = membership.status
         if "status" in fields:
             new_status = fields["status"]
             if new_status == MembershipStatus.ACTIVE and membership.joined_at is None:
@@ -103,6 +113,8 @@ class MembershipBusinessLogicLayer:
         with transaction.atomic():
             membership.save()
             self._schedule_effective_permissions_invalidation(membership)
+            if membership.status != previous_status and membership.status == MembershipStatus.SUSPENDED:
+                self._notify_member(membership, "staff_suspended")
 
         return membership
 
@@ -141,6 +153,7 @@ class MembershipBusinessLogicLayer:
                 active_tenant_id=membership.tenant_id,
             ).update(active_tenant_id=None, active_branch_id=None)
             self._schedule_effective_permissions_invalidation(membership)
+            self._notify_member(membership, "staff_removed", actor_id=actor_id)
 
         return membership
 

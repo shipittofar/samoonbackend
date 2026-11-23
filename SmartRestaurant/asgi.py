@@ -11,12 +11,13 @@ from django.core.asgi import get_asgi_application  # noqa: E402
 from core.middleware import JWTAuthMiddleware  # noqa: E402
 from core.ws.routing import websocket_urlpatterns as console_websocket_urlpatterns  # noqa: E402
 from orders.ws.routing import websocket_urlpatterns as order_websocket_urlpatterns  # noqa: E402
+from notifications.routing import websocket_urlpatterns as notification_websocket_urlpatterns  # noqa: E402
 
 django_asgi_app = get_asgi_application()
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": JWTAuthMiddleware(
-        URLRouter(console_websocket_urlpatterns + order_websocket_urlpatterns)
+        URLRouter(console_websocket_urlpatterns + order_websocket_urlpatterns + notification_websocket_urlpatterns)
     ),
 })

@@ -32,6 +32,7 @@ from core.exceptions import (
     TableNumberRequiredException,
     TenantNotFoundException,
 )
+from notifications import events as notification_events
 from orders.ws.notifications import (
     notify_order_status_change,
     schedule_console_order_changed,
@@ -124,6 +125,7 @@ class OrdersBusinessLogicLayer:
 
             self.dal.create_status_history(order, OrderStatus.PENDING)
             schedule_console_order_changed(order)
+            notification_events.order_created(order)
 
         return self.dal.get_order_by_id(order.id)
 
@@ -219,6 +221,7 @@ class OrdersBusinessLogicLayer:
             )
             schedule_console_order_changed(order)
             transaction.on_commit(lambda: notify_order_status_change(order))
+            notification_events.order_status_changed(order, actor=customer)
 
         return self.dal.get_order_by_id(order.id)
 
@@ -239,6 +242,7 @@ class OrdersBusinessLogicLayer:
             )
             schedule_console_order_changed(locked)
             transaction.on_commit(lambda: notify_order_status_change(locked))
+            notification_events.order_status_changed(locked)
         return self.dal.get_order_by_id(locked.id)
 
     # ------------------------------------------------------------------
@@ -295,6 +299,7 @@ class OrdersBusinessLogicLayer:
             self.dal.create_status_history(order, new_status)
             schedule_console_order_changed(order)
             transaction.on_commit(lambda: notify_order_status_change(order))
+            notification_events.order_status_changed(order, actor=user)
 
         return self.dal.get_order_by_id(order.id)
 

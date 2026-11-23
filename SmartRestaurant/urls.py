@@ -71,6 +71,7 @@ urlpatterns = [
     # Platform superuser console API
     path('api/superadmin/', include('superadmin.api.urls', namespace='superadmin')),
     path('api/platform/', include('platform_settings.api.urls', namespace='platform_settings')),
+    path('api/notifications/', include(('notifications.api', 'notifications'), namespace='notifications')),
     path('api/branches/', include('tenants.api.urls_branches', namespace='branches')),
     path('api/menu/', include('menu.api.urls', namespace='menu')),
 

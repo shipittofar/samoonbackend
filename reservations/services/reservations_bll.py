@@ -16,6 +16,7 @@ from core.exceptions import (
     ReservationsDisabledException,
 )
 from core.ws.publisher import RESERVATION_CHANGED, schedule_console_event_on_commit
+from notifications import events as notification_events
 from reservations.models import Reservation, ReservationStatus
 from reservations.selectors import ReservationsDataAccessLayer
 
@@ -69,6 +70,7 @@ class ReservationsBusinessLogicLayer:
                 status=ReservationStatus.PENDING,
             )
             self._schedule_changed(reservation)
+            notification_events.reservation_created(reservation)
 
         return self.dal.get_by_id(reservation.id)
 
@@ -87,6 +89,7 @@ class ReservationsBusinessLogicLayer:
                 reservation, status=ReservationStatus.CANCELLED
             )
             self._schedule_changed(reservation)
+            notification_events.reservation_status_changed(reservation, actor=customer)
 
         return self.dal.get_by_id(reservation.id)
 
@@ -113,6 +116,7 @@ class ReservationsBusinessLogicLayer:
 
             self.dal.update_reservation_fields(reservation, status=new_status)
             self._schedule_changed(reservation)
+            notification_events.reservation_status_changed(reservation, actor=user)
 
         return self.dal.get_by_id(reservation.id)
 

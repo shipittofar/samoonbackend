@@ -26,6 +26,12 @@ otp_bll = OTPBusinessLogiclayer()
 REGISTRATION_WINDOW = timedelta(minutes=15)
 
 
+def _notify_password_changed(user) -> None:
+    from notifications import events as notification_events
+
+    notification_events.password_changed(user)
+
+
 class AuthBusinessLogicLayer:
 
     @staticmethod
@@ -129,6 +135,7 @@ class PasswordAuthBusinessLogicLayer:
         user.set_password(new_password)
         user.save(update_fields=["password"])
         revoke_all_sessions(user)
+        _notify_password_changed(user)
         return auth_service.issue_tokens(user)
 
 
@@ -163,4 +170,5 @@ class ForgetPasswordBusinessLogicLayer:
         user.set_password(new_password)
         user.save(update_fields=["password"])
         revoke_all_sessions(user)
+        _notify_password_changed(user)
         return user

@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError
 
 from access.authorization.platform import is_platform_superuser
 from core.exceptions import PermissionDeniedException
+from notifications import events as notification_events
 from tenants.models import BusinessRequest, BusinessRequestStatus, Owner
 from tenants.models.tenant import OwnerStatus
 
@@ -25,7 +26,9 @@ def may_create_business_directly(user) -> bool:
 def file_request(*, user, **data) -> BusinessRequest:
     if BusinessRequest.objects.filter(user=user, status=BusinessRequestStatus.PENDING).exists():
         raise ValidationError({"detail": "You already have a request waiting for review."})
-    return BusinessRequest.objects.create(user=user, **data)
+    item = BusinessRequest.objects.create(user=user, **data)
+    notification_events.business_request_created(item)
+    return item
 
 
 def _assert_decider(actor) -> None:
@@ -84,6 +87,7 @@ def approve(*, request_id, actor) -> BusinessRequest:
     item.decided_by = actor
     item.decided_at = timezone.now()
     item.save(update_fields=["status", "tenant", "decided_by", "decided_at", "updated_at"])
+    notification_events.business_request_decided(item, actor=actor)
     return item
 
 
@@ -96,4 +100,5 @@ def reject(*, request_id, actor, reason: str = "") -> BusinessRequest:
     item.decided_by = actor
     item.decided_at = timezone.now()
     item.save(update_fields=["status", "rejection_reason", "decided_by", "decided_at", "updated_at"])
+    notification_events.business_request_decided(item, actor=actor)
     return item
