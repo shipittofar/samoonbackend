@@ -135,6 +135,23 @@ class MenuAndOrderTests(TestCase):
         self.espresso.refresh_from_db()
         self.assertEqual(self.espresso.prices, {"USD": "3.50"})
 
+    def test_multipart_update_without_prices_keeps_them(self):
+        """A form update (e.g. with an image) that does not send prices must
+        not erase the owner's per-currency prices."""
+        client = APIClient()
+        client.force_authenticate(self.owner)
+        url = f"/api/menu/items/{self.espresso.id}/?branch_id={self.branch.id}"
+        res = client.patch(url, {"name": "Espresso Doppio"}, format="multipart")
+        self.assertIn(res.status_code, (200, 201), res.content)
+        self.espresso.refresh_from_db()
+        self.assertEqual(self.espresso.name, "Espresso Doppio")
+        self.assertEqual(self.espresso.prices, {"USD": "3.00"})
+        # And a form that does send them (as JSON text) still sets them.
+        res = client.patch(url, {"prices": '{"USD": "4"}'}, format="multipart")
+        self.assertIn(res.status_code, (200, 201), res.content)
+        self.espresso.refresh_from_db()
+        self.assertEqual(self.espresso.prices, {"USD": "4.00"})
+
     def _order(self, display_currency):
         return OrdersBusinessLogicLayer().create_order(
             customer=self.customer,

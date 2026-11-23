@@ -42,6 +42,7 @@ class MenuItemOutputSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     description = serializers.SerializerMethodField()
     currency = serializers.SerializerMethodField()
+    prices = serializers.SerializerMethodField()
 
     class Meta:
         model = MenuItem
@@ -137,10 +138,16 @@ class MenuItemOutputSerializer(serializers.ModelSerializer):
 
     def get_currency(self, obj):
         """The currency ``price`` is in: the branch's (platform base if unset)."""
-        from currencies.services import base_code
+        from currencies.services import DEFAULT_BASE, base_code
 
         branch = getattr(obj, "branch", None)
-        return (getattr(branch, "currency", "") or base_code()) if branch is not None else base_code()
+        if branch is None:
+            return DEFAULT_BASE  # no branch loaded: no database lookup
+        return getattr(branch, "currency", "") or base_code()
+
+    def get_prices(self, obj):
+        """The owner's own prices in other currencies, e.g. {"USD": "3.00"}."""
+        return dict(getattr(obj, "prices", None) or {})
 
 
 class ExtraOutputSerializer(serializers.ModelSerializer):
