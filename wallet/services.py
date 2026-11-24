@@ -59,9 +59,13 @@ def customer_account(user, currency: str) -> WalletAccount:
     return account
 
 
-def business_account(tenant, currency: str) -> WalletAccount:
+def business_account(tenant, currency: str, kind: str = AccountKind.BUSINESS) -> WalletAccount:
+    """A business's account. ``business`` (available) may go negative: that
+    is commission the business owes on orders not paid through the wallet.
+    ``business_pending`` and ``business_reserved`` never go negative."""
     account, _ = WalletAccount.objects.get_or_create(
-        kind=AccountKind.BUSINESS, tenant=tenant, currency=currency.upper()
+        kind=kind, tenant=tenant, currency=currency.upper(),
+        defaults={"allow_negative": kind == AccountKind.BUSINESS},
     )
     return account
 
@@ -195,16 +199,17 @@ def _notify(tx: LedgerTransaction) -> None:
 
 
 def pay_order(order, *, customer) -> LedgerTransaction:
-    """Debit the customer's wallet (order currency) and credit the business.
-    Call inside the order's database transaction; insufficient balance raises
-    and rolls the order back."""
+    """Debit the customer's wallet (order currency) and credit the business's
+    on-hold account (released after the hold period once the order is done,
+    see settlement.services). Call inside the order's database transaction;
+    insufficient balance raises and rolls the order back."""
     currency = (order.currency or "").upper() or "IRT"
     amount = _amount(order.total)
     if amount <= 0:
         raise ValidationError({"payment_method": "Nothing to pay."})
     payer = customer_account(customer, currency)
     _check_limits(payer, amount, limit_name="daily_spend", kinds=[TransactionKind.ORDER_PAYMENT])
-    payee = business_account(order.branch.tenant, currency)
+    payee = business_account(order.branch.tenant, currency, AccountKind.BUSINESS_PENDING)
     tx = post(
         kind=TransactionKind.ORDER_PAYMENT,
         currency=currency,

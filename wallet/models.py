@@ -19,9 +19,22 @@ from django.db import models
 
 class AccountKind(models.TextChoices):
     CUSTOMER = "customer", "Customer wallet"
-    BUSINESS = "business", "Business (payable to owner)"
+    # Business money, per tenant and currency (settlement app):
+    #   business          available to pay out; may go negative = the business
+    #                     owes commission on cash/card orders
+    #   business_pending  wallet-paid orders still inside the hold period
+    #   business_reserved requested payouts waiting for a superuser
+    BUSINESS = "business", "Business: available"
+    BUSINESS_PENDING = "business_pending", "Business: on hold"
+    BUSINESS_RESERVED = "business_reserved", "Business: payout requested"
     SYSTEM_TOPUP = "system_topup", "System: top-ups received"
     SYSTEM_ADJUSTMENT = "system_adjustment", "System: manual adjustments"
+    SYSTEM_REVENUE = "system_revenue", "System: platform commission"
+    SYSTEM_PAYOUT = "system_payout", "System: paid out to businesses"
+
+
+SYSTEM_KINDS = ("system_topup", "system_adjustment", "system_revenue", "system_payout")
+BUSINESS_SUB_KINDS = ("business_pending", "business_reserved")
 
 
 class WalletAccount(models.Model):
@@ -48,8 +61,13 @@ class WalletAccount(models.Model):
                 fields=["tenant", "currency"], condition=models.Q(kind="business"), name="uniq_business_wallet"
             ),
             models.UniqueConstraint(
+                fields=["tenant", "kind", "currency"],
+                condition=models.Q(kind__in=list(BUSINESS_SUB_KINDS)),
+                name="uniq_business_sub_wallet",
+            ),
+            models.UniqueConstraint(
                 fields=["kind", "currency"],
-                condition=models.Q(kind__in=["system_topup", "system_adjustment"]),
+                condition=models.Q(kind__in=list(SYSTEM_KINDS)),
                 name="uniq_system_wallet",
             ),
             models.CheckConstraint(
@@ -69,6 +87,11 @@ class TransactionKind(models.TextChoices):
     TOPUP = "topup", "Top-up"
     ADJUSTMENT = "adjustment", "Manual adjustment"
     REVERSAL = "reversal", "Reversal"
+    COMMISSION = "commission", "Platform commission"
+    RELEASE = "settlement_release", "Released after hold"
+    PAYOUT_HOLD = "payout_hold", "Payout requested"
+    PAYOUT = "payout", "Paid out"
+    PAYOUT_RETURN = "payout_return", "Payout rejected or cancelled"
 
 
 class LedgerTransaction(models.Model):

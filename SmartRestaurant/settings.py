@@ -140,6 +140,7 @@ INSTALLED_APPS = [
     'notifications.apps.NotificationsConfig',
     'currencies.apps.CurrenciesConfig',
     'wallet.apps.WalletConfig',
+    'settlement.apps.SettlementConfig',
 ]
 
 MIDDLEWARE = [
@@ -415,6 +416,11 @@ CELERY_BEAT_SCHEDULE = {
     "expire-orphan-uploads": {
         "task": "uploads.tasks.expire_orphan_uploads",
         "schedule": 3600.0,
+    },
+    # Release finished hold periods; weekly payout requests when enabled.
+    "settlement-run": {
+        "task": "settlement.tasks.run_settlement",
+        "schedule": 900.0,
     },
 }
 

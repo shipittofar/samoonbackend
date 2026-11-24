@@ -201,6 +201,61 @@ TYPES: dict[str, NotificationType] = {
             "ar": "تغيّر رصيد محفظتك بمقدار {signed_amount} {currency} ({reason}). الرصيد: {balance} {currency}",
         },
     ),
+    # ── Settlement with businesses ────────────────────────────────────────
+    "settlement_payout_requested": NotificationType(
+        category="payment", priority="high",
+        title={"fa": "درخواست تسویه", "en": "Payout requested", "ar": "طلب تسوية"},
+        message={
+            "fa": "«{business}» درخواست تسویهٔ {amount} {currency} داد",
+            "en": "“{business}” requested a payout of {amount} {currency}",
+            "ar": "طلب «{business}» تسوية بمبلغ {amount} {currency}",
+        },
+    ),
+    "settlement_account_submitted": NotificationType(
+        category="payment", priority="normal",
+        title={"fa": "حساب تسویهٔ جدید", "en": "New payout account", "ar": "حساب تسوية جديد"},
+        message={
+            "fa": "«{business}» حساب {account} را برای تسویه ثبت کرد و منتظر تأیید است",
+            "en": "“{business}” added payout account {account}; it needs approval",
+            "ar": "أضاف «{business}» حساب التسوية {account} وهو بانتظار الموافقة",
+        },
+    ),
+    "settlement_account_approved": NotificationType(
+        category="payment", priority="normal",
+        title={"fa": "حساب تسویه تأیید شد", "en": "Payout account approved", "ar": "تمت الموافقة على حساب التسوية"},
+        message={
+            "fa": "حساب {account} برای تسویهٔ «{business}» تأیید شد",
+            "en": "Payout account {account} for “{business}” was approved",
+            "ar": "تمت الموافقة على حساب {account} لتسوية «{business}»",
+        },
+    ),
+    "settlement_account_rejected": NotificationType(
+        category="payment", priority="high",
+        title={"fa": "حساب تسویه رد شد", "en": "Payout account rejected", "ar": "تم رفض حساب التسوية"},
+        message={
+            "fa": "حساب {account} برای «{business}» رد شد: {reason}",
+            "en": "Payout account {account} for “{business}” was rejected: {reason}",
+            "ar": "تم رفض حساب {account} لـ«{business}»: {reason}",
+        },
+    ),
+    "settlement_payout_paid": NotificationType(
+        category="payment", priority="high", channels=("in_app", "push"),
+        title={"fa": "تسویه واریز شد", "en": "Payout sent", "ar": "تم إرسال التسوية"},
+        message={
+            "fa": "{amount} {currency} به {account} واریز شد. شماره پیگیری: {reference}",
+            "en": "{amount} {currency} was sent to {account}. Reference: {reference}",
+            "ar": "تم إرسال {amount} {currency} إلى {account}. المرجع: {reference}",
+        },
+    ),
+    "settlement_payout_rejected": NotificationType(
+        category="payment", priority="high",
+        title={"fa": "درخواست تسویه رد شد", "en": "Payout rejected", "ar": "تم رفض التسوية"},
+        message={
+            "fa": "درخواست تسویهٔ {amount} {currency} رد شد و مبلغ به موجودی برگشت: {reason}",
+            "en": "The payout of {amount} {currency} was rejected and returned to your balance: {reason}",
+            "ar": "تم رفض تسوية {amount} {currency} وأعيد المبلغ إلى رصيدك: {reason}",
+        },
+    ),
     # ── Account security ──────────────────────────────────────────────────
     "password_changed": NotificationType(
         category="system", priority="urgent",

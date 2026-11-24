@@ -318,6 +318,12 @@ class OrdersBusinessLogicLayer:
             self.dal.create_status_history(order, new_status)
             if new_status == OrderStatus.CANCELLED:
                 self._refund_wallet(order, actor=user)
+            else:
+                # Done (served / delivered / picked up / completed): commission
+                # and hold period for the business (once per order).
+                from settlement.services import on_order_done
+
+                on_order_done(order)
             schedule_console_order_changed(order)
             transaction.on_commit(lambda: notify_order_status_change(order))
             notification_events.order_status_changed(order, actor=user)

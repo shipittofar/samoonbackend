@@ -104,7 +104,7 @@ class OrderPaymentTests(TestCase):
             order = self.order()
         self.assertEqual(order.payment_status, PaymentStatus.PAID)
         self.assertEqual(services.balance_of(self.customer, "IRT"), Decimal("300000"))
-        business = WalletAccount.objects.get(kind=AccountKind.BUSINESS, tenant=self.tenant, currency="IRT")
+        business = WalletAccount.objects.get(kind=AccountKind.BUSINESS_PENDING, tenant=self.tenant, currency="IRT")  # held until settled
         self.assertEqual(business.balance, Decimal("200000"))
         self.assertTrue(services.health()["ok"])
         self.assertTrue(Notification.objects.filter(recipient=self.customer, type="wallet_payment").exists())
