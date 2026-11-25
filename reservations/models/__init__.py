@@ -1,3 +1,3 @@
-from reservations.models.reservation import Reservation, ReservationStatus
+from reservations.models.reservation import BranchReservationRules, Reservation, ReservationStatus
 
-__all__ = ["Reservation", "ReservationStatus"]
+__all__ = ["BranchReservationRules", "Reservation", "ReservationStatus"]

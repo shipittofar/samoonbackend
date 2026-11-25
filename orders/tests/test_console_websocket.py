@@ -1,6 +1,6 @@
 """Channels tests for the Console workspace websocket."""
 import uuid
-from datetime import timedelta
+from datetime import time, timedelta
 from decimal import Decimal
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -327,7 +327,8 @@ class ConsoleWebsocketTests(TransactionTestCase):
                     "guest_name": "Ada",
                     "guest_phone": "+15551212",
                     "party_size": 2,
-                    "reserved_at": timezone.now() + timedelta(hours=3),
+                    "date": timezone.localdate() + timedelta(days=2),
+                    "time": time(13, 0),  # inside the default opening hours
                 },
             )
             event = await communicator.receive_json_from()

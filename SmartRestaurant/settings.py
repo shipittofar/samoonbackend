@@ -210,6 +210,8 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
+# Where the businesses are: times written into notification texts use it.
+BUSINESS_TIME_ZONE = os.getenv("BUSINESS_TIME_ZONE", "Asia/Tehran")
 
 USE_I18N = True
 
@@ -256,6 +258,8 @@ REST_FRAMEWORK = {
         'auth_otp_send': '10/hour',
         # Wallet top-ups: each start calls a payment gateway.
         'wallet_topup': '30/hour',
+        # Each booking holds seats and notifies the business.
+        'reservation_create': '20/hour',
         'auth_otp_verify': '30/hour',
         'auth_register': '10/hour',
         'auth_password_login': '20/hour',

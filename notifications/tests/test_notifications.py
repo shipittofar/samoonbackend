@@ -22,6 +22,17 @@ from reservations.models import ReservationStatus
 from reservations.services.reservations_bll import ReservationsBusinessLogicLayer
 
 
+def first_slot(branch):
+    """A time the branch can be booked for (two days ahead)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from reservations.services.slots import available_slots
+
+    return available_slots(branch, timezone.localdate() + timedelta(days=2))[0]
+
+
 def types_for(user):
     return sorted(Notification.objects.filter(recipient=user).values_list("type", flat=True))
 
@@ -85,7 +96,7 @@ class EventTests(TestCase):
                 customer=self.customer,
                 validated_data={
                     "branch_id": self.branch.id, "guest_name": "Sara", "guest_phone": "+989120000000",
-                    "party_size": 4, "reserved_at": make_reservation(self.branch).reserved_at,
+                    "party_size": 4, "reserved_at": first_slot(self.branch),
                 },
             )
         self.assertIn("reservation_created", types_for(self.owner))
@@ -253,6 +264,44 @@ class SocketTests(TransactionTestCase):
             await b.disconnect()
 
         async_to_sync(scenario)()
+
+    def _socket_event(self, user, action):
+        """Connect ``user``, run ``action``, return (first event, nothing after it)."""
+        from channels.db import database_sync_to_async
+
+        from SmartRestaurant.asgi import application
+
+        token = access_token(user)
+
+        async def scenario():
+            c = WebsocketCommunicator(application, f"/ws/notifications/?token={token}&lang=fa")
+            self.assertTrue((await c.connect())[0])
+            await c.receive_json_from()
+            await database_sync_to_async(action)()
+            event = await c.receive_json_from(timeout=5)
+            quiet = await c.receive_nothing(timeout=0.5)
+            await c.disconnect()
+            return event, quiet
+
+        return async_to_sync(scenario)()
+
+    def test_becoming_an_owner_pushes_a_session_change(self):
+        from tenants.models import Owner
+
+        user = make_user()
+        event, _ = self._socket_event(user, lambda: Owner.objects.create(user=user))
+        self.assertEqual(event, {"type": "data.changed", "data": {"topics": ["session"]}})
+
+    def test_muted_notification_still_refreshes_the_page(self):
+        from notifications.services import notify
+
+        user = make_user()
+        NotificationPreference.objects.create(user=user, category="order", enabled=False)
+        event, quiet = self._socket_event(
+            user, lambda: notify(recipients=[user], type_="order_status_changed", data={})
+        )
+        self.assertEqual(event, {"type": "data.changed", "data": {"topics": ["orders"]}})
+        self.assertTrue(quiet)
 
     def test_anonymous_socket_is_refused(self):
         from SmartRestaurant.asgi import application

@@ -35,10 +35,13 @@ def _person(user, fallback: str = "") -> str:
     return full or fallback or (user.phone_number or "")
 
 
-def _when(dt) -> str:
+def _when(dt, branch=None) -> str:
     if not dt:
         return ""
-    return timezone.localtime(dt).strftime("%Y-%m-%d %H:%M")
+    # The branch's local time, not the server's UTC.
+    from reservations.services.slots import branch_zone
+
+    return timezone.localtime(dt, branch_zone(branch)).strftime("%Y-%m-%d %H:%M")
 
 
 # ── Orders ───────────────────────────────────────────────────────────────────
@@ -108,7 +111,7 @@ def _reservation_data(reservation) -> dict:
         "branch": reservation.branch.name,
         "customer": reservation.guest_name or _person(getattr(reservation, "customer", None), "—"),
         "party_size": reservation.party_size,
-        "when": _when(reservation.reserved_at),
+        "when": _when(reservation.reserved_at, reservation.branch),
         "status": reservation.status,
     }
 
@@ -152,6 +155,21 @@ def reservation_status_changed(reservation, *, actor=None) -> None:
         type_=type_,
         actor=actor,
         data=_reservation_data(reservation),
+        link_id=reservation.id,
+        link_href="/dashboard/reservations",
+    )
+
+
+@_safe
+def reservation_duration_changed(reservation, *, actor=None) -> None:
+    customer = getattr(reservation, "customer", None)
+    if customer is None:
+        return
+    notify(
+        recipients=[customer],
+        type_="reservation_duration_changed",
+        actor=actor,
+        data={**_reservation_data(reservation), "until": _when(reservation.ends_at, reservation.branch)[-5:]},
         link_id=reservation.id,
         link_href="/dashboard/reservations",
     )

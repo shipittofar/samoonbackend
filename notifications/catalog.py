@@ -99,6 +99,15 @@ TYPES: dict[str, NotificationType] = {
             "ar": "تم تأكيد حجزك في {branch} بتاريخ {when}",
         },
     ),
+    "reservation_duration_changed": NotificationType(
+        category="reservation", priority="normal", link_type="reservation",
+        title={"fa": "مدت رزرو تغییر کرد", "en": "Reservation length changed", "ar": "تغيّرت مدة الحجز"},
+        message={
+            "fa": "رزرو شما در {branch} برای {when} حالا تا ساعت {until} است",
+            "en": "Your booking at {branch} for {when} now runs until {until}",
+            "ar": "حجزك في {branch} بتاريخ {when} أصبح حتى الساعة {until}",
+        },
+    ),
     "reservation_cancelled": NotificationType(
         category="reservation", priority="high", link_type="reservation",
         title={"fa": "رزرو لغو شد", "en": "Reservation cancelled", "ar": "تم إلغاء الحجز"},

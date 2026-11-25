@@ -33,6 +33,14 @@ class ReservationsDataAccessLayer:
         )
 
     @staticmethod
+    def list_for_customer(customer):
+        return (
+            Reservation.objects.filter(customer=customer)
+            .select_related("branch", "branch__tenant")
+            .order_by("-reserved_at", "-created_at")
+        )
+
+    @staticmethod
     def get_for_update(reservation_id: UUID) -> Optional[Reservation]:
         return (
             Reservation.objects.select_related(
@@ -53,6 +61,23 @@ class ReservationsDataAccessLayer:
             Branch.objects.select_related("tenant")
             .filter(pk=branch_id, is_active=True, **OPERATIONAL_TENANT_LOOKUP)
             .first()
+        )
+
+    @staticmethod
+    def lock_branch(branch_id: UUID) -> None:
+        """Serialize bookings of one branch, so two can't take the last seats."""
+        Branch.objects.select_for_update().filter(pk=branch_id).values_list("pk").first()
+
+    @staticmethod
+    def branches_of_tenant(tenant_id: UUID):
+        return list(Branch.objects.filter(tenant_id=tenant_id).select_related("tenant"))
+
+    @staticmethod
+    def list_for_branches(branch_ids):
+        return (
+            Reservation.objects.filter(branch_id__in=branch_ids)
+            .select_related("branch", "branch__tenant", "customer")
+            .order_by("reserved_at", "created_at")
         )
 
     @staticmethod

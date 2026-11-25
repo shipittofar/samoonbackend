@@ -33,6 +33,7 @@ REST_FRAMEWORK = {
             for scope in (
                 "auth_otp_send",
                 "wallet_topup",
+                "reservation_create",
                 "auth_otp_verify",
                 "auth_register",
                 "auth_password_login",
