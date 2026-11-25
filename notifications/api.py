@@ -61,7 +61,9 @@ def _filtered(request, params):
     qs = _own(request)
     tenant_id = _tenant_param(params)
     if tenant_id:
-        qs = qs.filter(tenant_id=tenant_id)
+        # The console also shows platform messages (payouts, business requests...)
+        # that belong to no business; purely personal ones stay on the site.
+        qs = qs.filter(Q(tenant_id=tenant_id) | Q(tenant__isnull=True, link_href__startswith="/console/"))
     branch_id = (params.get("branchId") or "").strip()
     if branch_id:
         qs = qs.filter(branch_id=branch_id)

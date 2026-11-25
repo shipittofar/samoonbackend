@@ -312,6 +312,9 @@ def _apply(topup: TopUp, verdict: Verdict, *, actor=None) -> TopUp:
     elif verdict.status in ("failed", "cancelled", "expired"):
         topup.status = verdict.status
         topup.failure_reason = verdict.reason[:300]
+        from notifications.live import push_changes
+
+        push_changes([topup.user_id], ["wallet"])
     topup.save()
     return topup
 
@@ -422,6 +425,9 @@ def reject(*, topup_id, actor, reason: str) -> TopUp:
         topup.failure_reason = reason[:300]
         topup.reviewed_by = actor
         topup.save()
+        from notifications.live import push_changes
+
+        push_changes([topup.user_id], ["wallet"])
     return topup
 
 

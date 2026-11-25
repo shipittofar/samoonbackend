@@ -50,6 +50,10 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
             return
         await self.send_json({"type": "notification.new", "data": payload, "unreadCount": event.get("unread", 0)})
 
+    async def data_changed(self, event):
+        # Topic names only; the page refetches through the API (notifications.live).
+        await self.send_json({"type": "data.changed", "data": {"topics": event.get("topics", [])}})
+
     @database_sync_to_async
     def _payload(self, notification_id):
         from notifications.models import Notification

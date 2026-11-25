@@ -174,6 +174,11 @@ def notify(*, recipients, type_: str, **kwargs) -> None:
     if not recipients:
         return
 
+    from notifications.live import push_changes, topics_for_type
+
+    actor = kwargs.get("actor")
+    push_changes([*(u.id for u in recipients), getattr(actor, "id", None)], topics_for_type(type_))
+
     def run():
         try:
             _create(recipients=recipients, type_=type_, **kwargs)
